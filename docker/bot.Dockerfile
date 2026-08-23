@@ -15,7 +15,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY alembic.ini ./
+# README.md is referenced by pyproject's `readme` field, so the project
+# itself fails to build without it.
+COPY README.md alembic.ini ./
 COPY migrations ./migrations
 COPY seeds ./seeds
 COPY src ./src

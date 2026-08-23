@@ -85,5 +85,15 @@ jobs:
           context: .
           file: docker/bot.Dockerfile
           push: false
+          load: true
+          tags: gym-assistant-bot:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Building is not the same as running: a missing file or a broken
+      # entrypoint only shows up when the image actually starts.
+      - name: Smoke-test the image
+        run: |
+          docker run --rm gym-assistant-bot:ci python -c "import gym_assistant; print(gym_assistant.__version__)"
+          docker run --rm gym-assistant-bot:ci alembic --version
+          test "$(docker run --rm gym-assistant-bot:ci id -u)" = "10001"
