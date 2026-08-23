@@ -1,10 +1,10 @@
-"""User-facing strings.
+"""User-facing strings and rendering.
 
-Every string shown to a user lives here, never inline in a handler.
-That keeps tone consistent and makes adding a second locale a matter of
-adding a module rather than combing through the codebase.
+Every string shown to a user lives in ``ru``, never inline in a handler.
+That keeps tone consistent and makes a second locale a new module rather
+than a hunt through the codebase.
 """
 
-from gym_assistant.bot.texts import ru
+from gym_assistant.bot.texts import render, ru
 
-__all__ = ["ru"]
+__all__ = ["render", "ru"]

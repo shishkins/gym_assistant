@@ -12,10 +12,12 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
 
 from gym_assistant import __version__
+from gym_assistant.bot.commands import BOT_COMMANDS
 from gym_assistant.bot.handlers import get_routers
 from gym_assistant.bot.middlewares import (
     DbSessionMiddleware,
     LoggingMiddleware,
+    UserMiddleware,
     WhitelistMiddleware,
 )
 from gym_assistant.config import get_settings
@@ -39,14 +41,18 @@ async def main() -> None:
     dispatcher = Dispatcher(storage=storage)
     dispatcher["settings"] = settings
 
-    # Order matters: log context first, then access control, then the session.
+    # Order matters: log context, then access control, then a session, then
+    # the user row - each step depends on the one before it.
     dispatcher.update.outer_middleware(LoggingMiddleware())
     dispatcher.update.outer_middleware(WhitelistMiddleware(settings.allowed_ids))
     dispatcher.update.outer_middleware(DbSessionMiddleware(session_factory))
+    dispatcher.update.outer_middleware(UserMiddleware())
 
     dispatcher.include_routers(*get_routers())
 
     me = await bot.get_me()
+    # Keeps Telegram's native command menu in sync without BotFather.
+    await bot.set_my_commands(list(BOT_COMMANDS))
     log.info(
         "bot_started",
         username=me.username,

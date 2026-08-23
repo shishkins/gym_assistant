@@ -22,4 +22,8 @@ class DbSessionMiddleware(BaseMiddleware):
     ) -> Any:
         async with self._session_factory() as session:
             data["session"] = session
-            return await handler(event, data)
+            result = await handler(event, data)
+            # One update, one transaction. Leaving the block on an exception
+            # rolls back, so a half-applied update cannot reach the database.
+            await session.commit()
+            return result
