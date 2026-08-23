@@ -1,0 +1,15 @@
+# Local development overrides:
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d postgres redis
+# Then run the bot from your machine with `uv run python -m gym_assistant`
+# so you get instant reloads and a real debugger.
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  bot:
+    profiles: ["containerised"]

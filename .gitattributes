@@ -1,0 +1,14 @@
+# The repository stores LF for everything textual.
+# CI, Docker images and the VPS are all Linux; a stray CRLF in a shell
+# script or entrypoint fails there in ways that are tedious to diagnose.
+* text=auto eol=lf
+
+# Binary assets must never be touched.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.ico  binary
+*.pdf  binary
+
+# Generated: keep it out of diffs and out of language statistics.
+uv.lock linguist-generated=true
