@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gym_assistant.bot.handlers.exercises import show_menu
 from gym_assistant.bot.handlers.measurements import prompt_weight, send_photos
 from gym_assistant.bot.handlers.profile import show_card
-from gym_assistant.bot.keyboards import MainMenuCB, main_menu_keyboard
+from gym_assistant.bot.keyboards import CancelCB, MainMenuCB, main_menu_keyboard
 from gym_assistant.bot.texts import ru
 from gym_assistant.domain.models import User
 from gym_assistant.domain.services import ExerciseService
@@ -57,3 +57,17 @@ async def menu_action(
         case "help":
             await state.clear()
             await message.answer(ru.HELP, reply_markup=main_menu_keyboard())
+
+
+@router.callback_query(CancelCB.filter())
+async def cancel_action(callback: CallbackQuery, state: FSMContext) -> None:
+    """The button form of /cancel.
+
+    Typing a command to back out is a thing the user has to remember; every
+    step that waits for input carries this button instead.
+    """
+    await state.clear()
+    await callback.answer(ru.ACTION_CANCELLED)
+    message = callback.message
+    if isinstance(message, Message):
+        await message.edit_text(ru.ACTION_CANCELLED, reply_markup=main_menu_keyboard())

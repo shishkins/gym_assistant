@@ -42,8 +42,13 @@ class ExerciseService:
     async def count_by_muscle_group(self, muscle_group_id: int, *, user_id: int) -> int:
         return await self._exercises.count_by_muscle_group(muscle_group_id, user_id=user_id)
 
-    async def search(self, query: str, *, user_id: int, limit: int = 10) -> list[Exercise]:
-        return await self._exercises.search(query, user_id=user_id, limit=limit)
+    async def search(
+        self, query: str, *, user_id: int, limit: int = 10, offset: int = 0
+    ) -> list[Exercise]:
+        return await self._exercises.search(query, user_id=user_id, limit=limit, offset=offset)
+
+    async def count_search(self, query: str, *, user_id: int) -> int:
+        return await self._exercises.count_search(query, user_id=user_id)
 
     async def get(self, exercise_id: int, *, user_id: int) -> Exercise | None:
         return await self._exercises.get(exercise_id, user_id=user_id)
@@ -51,17 +56,25 @@ class ExerciseService:
     async def is_favourite(self, user_id: int, exercise_id: int) -> bool:
         return await self._exercises.is_favourite(user_id, exercise_id)
 
-    async def favourites(self, user_id: int) -> list[Exercise]:
-        return await self._exercises.favourites(user_id)
+    async def favourites(self, user_id: int, *, limit: int = 50, offset: int = 0) -> list[Exercise]:
+        return await self._exercises.favourites(user_id, limit=limit, offset=offset)
 
-    async def own(self, user_id: int) -> list[Exercise]:
-        return await self._exercises.own(user_id)
+    async def count_favourites(self, user_id: int) -> int:
+        return await self._exercises.count_favourites(user_id)
+
+    async def own(self, user_id: int, *, limit: int = 50, offset: int = 0) -> list[Exercise]:
+        return await self._exercises.own(user_id, limit=limit, offset=offset)
+
+    async def count_own(self, user_id: int) -> int:
+        return await self._exercises.count_own(user_id)
 
     async def stats(self, user_id: int) -> CatalogueStats:
+        # Counts, not len() of a fetched page: the lists are paged now, and
+        # counting a page would quietly under-report the totals.
         return CatalogueStats(
             total=await self._exercises.count_visible(user_id),
-            own=len(await self._exercises.own(user_id)),
-            favourites=len(await self._exercises.favourites(user_id, limit=1000)),
+            own=await self._exercises.count_own(user_id),
+            favourites=await self._exercises.count_favourites(user_id),
         )
 
     # -- authoring ---------------------------------------------------------

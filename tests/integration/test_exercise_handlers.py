@@ -244,3 +244,118 @@ async def test_menu_works_from_inside_a_wizard(bot: BotHarness) -> None:
     await bot.send("/menu")
 
     assert "Что делаем" in bot.session.last_text
+
+
+# --- Paging every list, and the cancel button ----------------------------
+
+
+async def _seed_own(session: AsyncSession, telegram_id: int, count: int) -> None:
+    """Creates exercises through the service: the wizard would take 6 taps each."""
+    from gym_assistant.domain.models import Equipment, ExerciseType
+    from gym_assistant.domain.services import ExerciseService, ProfileService
+
+    service = ExerciseService(session)
+    user = await ProfileService(session).get_or_create_user(telegram_id)
+    back = next(g.id for g in await service.muscle_groups() if g.code == "back")
+    for index in range(count):
+        await service.create_own(
+            user.id,
+            name=f"Пробное движение {index:02d}",
+            primary_muscle_group_id=back,
+            equipment=Equipment.BARBELL,
+            exercise_type=ExerciseType.WEIGHT_REPS,
+        )
+
+
+async def test_own_list_is_paged(bot: BotHarness, session: AsyncSession) -> None:
+    """An unpaged list of own exercises is a keyboard Telegram eventually refuses."""
+    await _seed_own(session, 777, 11)
+
+    await bot.send("/exercises")
+    await bot.tap_button("Мои упражнения")
+
+    assert bot.session.button_with("1/2")
+    await bot.tap_button("›")
+    assert bot.session.button_with("2/2")
+
+
+async def test_search_results_are_paged(bot: BotHarness, session: AsyncSession) -> None:
+    await _seed_own(session, 777, 11)
+
+    await bot.send("/exercises Пробное движение")
+
+    assert bot.session.button_with("1/2")
+    assert "Показано" in bot.session.last_text
+
+
+async def test_search_paging_keeps_the_query(bot: BotHarness, session: AsyncSession) -> None:
+    """The query lives in FSM data: Cyrillic does not fit in callback data."""
+    await _seed_own(session, 777, 11)
+    await bot.send("/exercises Пробное движение")
+
+    await bot.tap_button("›")
+
+    assert "Пробное движение" in bot.session.last_text
+    assert bot.session.button_with("Пробное движение 08")
+
+
+async def test_favourites_list_is_paged(bot: BotHarness, session: AsyncSession) -> None:
+    from gym_assistant.domain.services import ExerciseService, ProfileService
+
+    await _seed_own(session, 777, 11)
+    service = ExerciseService(session)
+    user = await ProfileService(session).get_or_create_user(777)
+    for exercise in await service.own(user.id, limit=11):
+        await service.toggle_favourite(user.id, exercise.id)
+
+    await bot.send("/exercises")
+    await bot.tap_button("Избранное")
+
+    assert bot.session.button_with("1/2")
+
+
+async def test_menu_counters_use_totals_not_page_size(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    """Counting a page would under-report once the lists became paged."""
+    await _seed_own(session, 777, 11)
+
+    await bot.send("/exercises")
+
+    assert "11" in bot.session.last_text
+
+
+async def test_cancel_button_leaves_the_create_wizard(bot: BotHarness) -> None:
+    await bot.send("/exercises")
+    await bot.tap_button("Добавить своё")
+
+    await bot.tap_button("Отмена")
+    assert "Отменил" in bot.session.last_text
+
+    bot.session.clear()
+    await bot.send("привет")
+    assert "не умею" in bot.session.last_text
+
+
+async def test_cancel_button_on_every_wizard_step(bot: BotHarness) -> None:
+    await bot.send("/exercises")
+    await bot.tap_button("Добавить своё")
+    await bot.send("Пробная тяга")
+    assert bot.session.button_with("Отмена")
+
+    await bot.tap_button("Спина")
+    assert bot.session.button_with("Отмена")
+
+    await bot.tap_button("Штанга")
+    assert bot.session.button_with("Отмена")
+
+
+async def test_cancel_button_on_weight_prompt(bot: BotHarness) -> None:
+    await bot.send("/weight")
+
+    assert bot.session.button_with("Отмена")
+    await bot.tap_button("Отмена")
+
+    bot.session.clear()
+    await bot.send("84")
+    assert "не умею" in bot.session.last_text

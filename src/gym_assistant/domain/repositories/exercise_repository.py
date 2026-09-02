@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import ColumnElement, Text, and_, case, cast, func, or_, select
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,35 +71,53 @@ class ExerciseRepository:
         exercise: Exercise | None = await self._session.scalar(stmt)
         return exercise
 
-    async def search(self, query: str, *, user_id: int, limit: int = 10) -> list[Exercise]:
-        """Ranked search: exact alias, then prefix, then substring, then fuzzy."""
-        needle = " ".join(query.strip().lower().split())
-        if not needle:
-            return []
+    @staticmethod
+    def _normalise(query: str) -> str:
+        return " ".join(query.strip().lower().split())
 
+    def _search_terms(self, needle: str) -> tuple[ColumnElement[bool], Any, Any]:
+        """Match predicate, rank and closeness, built once.
+
+        Counting and paging must use the identical predicate: if they drift,
+        the page counter starts lying about a list the user can see.
+        """
         # Array containment rather than `= ANY(...)`: only @> uses the GIN index.
         alias_hit = Exercise.aliases.bool_op("@>")(cast([needle], ARRAY(Text)))
         name_prefix = Exercise.name_ru.ilike(f"{needle}%")
         name_contains = Exercise.name_ru.ilike(f"%{needle}%")
         closeness = func.word_similarity(needle, Exercise.name_ru)
 
-        rank = case(
-            (alias_hit, 0),
-            (name_prefix, 1),
-            (name_contains, 2),
-            else_=3,
-        )
+        matches = or_(alias_hit, name_contains, closeness > WORD_SIMILARITY_THRESHOLD)
+        rank = case((alias_hit, 0), (name_prefix, 1), (name_contains, 2), else_=3)
+        return matches, rank, closeness
 
+    async def search(
+        self, query: str, *, user_id: int, limit: int = 10, offset: int = 0
+    ) -> list[Exercise]:
+        """Ranked search: exact alias, then prefix, then substring, then fuzzy."""
+        needle = self._normalise(query)
+        if not needle:
+            return []
+
+        matches, rank, closeness = self._search_terms(needle)
         stmt = (
             select(Exercise)
-            .where(self._visible_to(user_id))
-            .where(or_(alias_hit, name_contains, closeness > WORD_SIMILARITY_THRESHOLD))
+            .where(self._visible_to(user_id), matches)
             # On a tie the shorter name wins: it is usually the base movement
             # ("Выпады" before "Болгарские выпады").
             .order_by(rank, closeness.desc(), func.length(Exercise.name_ru), Exercise.name_ru)
+            .offset(offset)
             .limit(limit)
         )
         return list(await self._session.scalars(stmt))
+
+    async def count_search(self, query: str, *, user_id: int) -> int:
+        needle = self._normalise(query)
+        if not needle:
+            return 0
+        matches, _, _ = self._search_terms(needle)
+        stmt = select(func.count()).select_from(Exercise).where(self._visible_to(user_id), matches)
+        return await self._session.scalar(stmt) or 0
 
     async def by_muscle_group(
         self, muscle_group_id: int, *, user_id: int, limit: int = 50, offset: int = 0
@@ -127,7 +147,7 @@ class ExerciseRepository:
         )
         return await self._session.scalar(stmt) or 0
 
-    async def favourites(self, user_id: int, *, limit: int = 10) -> list[Exercise]:
+    async def favourites(self, user_id: int, *, limit: int = 50, offset: int = 0) -> list[Exercise]:
         stmt = (
             select(Exercise)
             .join(UserExercisePref, UserExercisePref.exercise_id == Exercise.id)
@@ -137,17 +157,42 @@ class ExerciseRepository:
                 self._visible_to(user_id),
             )
             .order_by(Exercise.name_ru)
+            .offset(offset)
             .limit(limit)
         )
         return list(await self._session.scalars(stmt))
 
-    async def own(self, user_id: int) -> list[Exercise]:
+    async def count_favourites(self, user_id: int) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(Exercise)
+            .join(UserExercisePref, UserExercisePref.exercise_id == Exercise.id)
+            .where(
+                UserExercisePref.user_id == user_id,
+                UserExercisePref.is_favourite.is_(True),
+                self._visible_to(user_id),
+            )
+        )
+        return await self._session.scalar(stmt) or 0
+
+    async def own(self, user_id: int, *, limit: int = 50, offset: int = 0) -> list[Exercise]:
+        """Bounded on purpose: an unbounded list becomes a keyboard Telegram refuses."""
         stmt = (
             select(Exercise)
             .where(Exercise.owner_user_id == user_id, Exercise.is_active.is_(True))
             .order_by(Exercise.name_ru)
+            .offset(offset)
+            .limit(limit)
         )
         return list(await self._session.scalars(stmt))
+
+    async def count_own(self, user_id: int) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(Exercise)
+            .where(Exercise.owner_user_id == user_id, Exercise.is_active.is_(True))
+        )
+        return await self._session.scalar(stmt) or 0
 
     async def count_visible(self, user_id: int) -> int:
         stmt = select(func.count()).select_from(Exercise).where(self._visible_to(user_id))

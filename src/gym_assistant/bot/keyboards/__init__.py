@@ -1,12 +1,13 @@
 """Inline keyboards and their callback payloads."""
 
+from gym_assistant.bot.keyboards.common import CancelCB, cancel_button, cancel_keyboard, with_cancel
 from gym_assistant.bot.keyboards.exercises import (
     EQUIPMENT_BY_VALUE,
     TYPE_BY_VALUE,
     ExCardCB,
     ExFavCB,
-    ExGroupCB,
     ExHideCB,
+    ExListCB,
     ExMenuCB,
     ExNewCB,
     ExUnhideCB,
@@ -17,7 +18,6 @@ from gym_assistant.bot.keyboards.exercises import (
     new_equipment_keyboard,
     new_group_keyboard,
     new_type_keyboard,
-    search_results_keyboard,
     undo_hide_keyboard,
 )
 from gym_assistant.bot.keyboards.main_menu import MainMenuCB, main_menu_keyboard
@@ -37,17 +37,20 @@ __all__ = [
     "CHOICE_ENUMS",
     "EQUIPMENT_BY_VALUE",
     "TYPE_BY_VALUE",
+    "CancelCB",
     "ChoiceCB",
     "EditCB",
     "ExCardCB",
     "ExFavCB",
-    "ExGroupCB",
     "ExHideCB",
+    "ExListCB",
     "ExMenuCB",
     "ExNewCB",
     "ExUnhideCB",
     "MainMenuCB",
     "SkipCB",
+    "cancel_button",
+    "cancel_keyboard",
     "exercise_card_keyboard",
     "exercise_list_keyboard",
     "experience_keyboard",
@@ -59,8 +62,8 @@ __all__ = [
     "new_group_keyboard",
     "new_type_keyboard",
     "profile_keyboard",
-    "search_results_keyboard",
     "sex_keyboard",
     "skip_keyboard",
     "undo_hide_keyboard",
+    "with_cancel",
 ]

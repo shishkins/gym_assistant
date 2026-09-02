@@ -281,6 +281,9 @@ BTN_NEXT_PAGE = "›"
 PAGE_INDICATOR = "{page}/{total}"
 
 BTN_EXIT_SEARCH = "✖️ Выйти из поиска"
+BTN_CANCEL_ACTION = "✖️ Отмена"
+ACTION_CANCELLED = "Отменил."
+LIST_COUNTER = "Показано {shown} из {total}"
 BTN_TO_CATALOGUE = "📖 В справочник"
 
 SEARCH_MODE_ON = (

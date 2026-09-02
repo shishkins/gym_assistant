@@ -6,6 +6,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from gym_assistant.bot.keyboards.common import with_cancel
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.domain.models import Equipment, Exercise, ExerciseType, MuscleGroup
 
@@ -14,8 +15,11 @@ class ExMenuCB(CallbackData, prefix="exm"):
     action: str  # search | groups | favourites | own | new | menu
 
 
-class ExGroupCB(CallbackData, prefix="exg"):
-    group_id: int
+class ExListCB(CallbackData, prefix="exl"):
+    """Any paged list of exercises."""
+
+    kind: str  # group | favourites | own | search
+    ref: int = 0  # muscle group id when kind == "group"
     page: int = 0
 
 
@@ -56,7 +60,7 @@ def menu_keyboard() -> InlineKeyboardMarkup:
 def groups_keyboard(groups: list[MuscleGroup]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for group in groups:
-        builder.button(text=group.name_ru, callback_data=ExGroupCB(group_id=group.id))
+        builder.button(text=group.name_ru, callback_data=ExListCB(kind="group", ref=group.id))
     builder.adjust(2)
     builder.row(
         InlineKeyboardButton(text=ru.BTN_BACK, callback_data=ExMenuCB(action="menu").pack())
@@ -67,56 +71,52 @@ def groups_keyboard(groups: list[MuscleGroup]) -> InlineKeyboardMarkup:
 def exercise_list_keyboard(
     exercises: list[Exercise],
     *,
+    kind: str,
+    ref: int = 0,
+    page: int = 0,
+    total_pages: int = 1,
     back_action: str = "menu",
-    pager: tuple[int, int, int] | None = None,
+    back_label: str | None = None,
 ) -> InlineKeyboardMarkup:
-    """``pager`` is ``(group_id, page, total_pages)`` when the list is paged."""
+    """Every exercise list goes through here, so all of them page alike.
+
+    Telegram refuses a message whose keyboard grows without bound, so an
+    unpaged list is not a cosmetic gap - it is a list that stops working
+    once it gets long.
+    """
     builder = InlineKeyboardBuilder()
     for exercise in exercises:
         label = exercise.name_ru if exercise.is_system else f"🛠 {exercise.name_ru}"
         builder.button(text=label, callback_data=ExCardCB(exercise_id=exercise.id))
     builder.adjust(1)
 
-    if pager is not None:
-        group_id, page, total_pages = pager
-        if total_pages > 1:
-            controls = [
-                InlineKeyboardButton(
-                    text=ru.BTN_PREV_PAGE,
-                    callback_data=ExGroupCB(group_id=group_id, page=page - 1).pack(),
+    if total_pages > 1:
+
+        def step(delta: int) -> InlineKeyboardButton:
+            target = page + delta
+            if 0 <= target < total_pages:
+                return InlineKeyboardButton(
+                    text=ru.BTN_PREV_PAGE if delta < 0 else ru.BTN_NEXT_PAGE,
+                    callback_data=ExListCB(kind=kind, ref=ref, page=target).pack(),
                 )
-                if page > 0
-                # A disabled-looking spacer keeps the row width steady, so the
-                # buttons do not jump sideways as you page through.
-                else InlineKeyboardButton(text=" ", callback_data=ExMenuCB(action="noop").pack()),
-                InlineKeyboardButton(
-                    text=ru.PAGE_INDICATOR.format(page=page + 1, total=total_pages),
-                    callback_data=ExMenuCB(action="noop").pack(),
-                ),
-                InlineKeyboardButton(
-                    text=ru.BTN_NEXT_PAGE,
-                    callback_data=ExGroupCB(group_id=group_id, page=page + 1).pack(),
-                )
-                if page + 1 < total_pages
-                else InlineKeyboardButton(text=" ", callback_data=ExMenuCB(action="noop").pack()),
-            ]
-            builder.row(*controls)
+            # A spacer keeps the row width steady, so buttons do not shift
+            # sideways as you page.
+            return InlineKeyboardButton(text=" ", callback_data=ExMenuCB(action="noop").pack())
+
+        builder.row(
+            step(-1),
+            InlineKeyboardButton(
+                text=ru.PAGE_INDICATOR.format(page=page + 1, total=total_pages),
+                callback_data=ExMenuCB(action="noop").pack(),
+            ),
+            step(1),
+        )
 
     builder.row(
-        InlineKeyboardButton(text=ru.BTN_BACK, callback_data=ExMenuCB(action=back_action).pack())
-    )
-    return builder.as_markup()
-
-
-def search_results_keyboard(exercises: list[Exercise]) -> InlineKeyboardMarkup:
-    """Search stays active, so the list offers a way out rather than "back"."""
-    builder = InlineKeyboardBuilder()
-    for exercise in exercises:
-        label = exercise.name_ru if exercise.is_system else f"🛠 {exercise.name_ru}"
-        builder.button(text=label, callback_data=ExCardCB(exercise_id=exercise.id))
-    builder.adjust(1)
-    builder.row(
-        InlineKeyboardButton(text=ru.BTN_EXIT_SEARCH, callback_data=ExMenuCB(action="menu").pack())
+        InlineKeyboardButton(
+            text=back_label or ru.BTN_BACK,
+            callback_data=ExMenuCB(action=back_action).pack(),
+        )
     )
     return builder.as_markup()
 
@@ -164,7 +164,7 @@ def new_group_keyboard(groups: list[MuscleGroup]) -> InlineKeyboardMarkup:
             callback_data=ExNewCB(field="muscle_group", value=str(group.id)),
         )
     builder.adjust(2)
-    return builder.as_markup()
+    return with_cancel(builder, "exercise_new").as_markup()
 
 
 def new_equipment_keyboard() -> InlineKeyboardMarkup:
@@ -175,7 +175,7 @@ def new_equipment_keyboard() -> InlineKeyboardMarkup:
             callback_data=ExNewCB(field="equipment", value=member.value),
         )
     builder.adjust(2)
-    return builder.as_markup()
+    return with_cancel(builder, "exercise_new").as_markup()
 
 
 def new_type_keyboard() -> InlineKeyboardMarkup:
@@ -186,7 +186,7 @@ def new_type_keyboard() -> InlineKeyboardMarkup:
             callback_data=ExNewCB(field="type", value=member.value),
         )
     builder.adjust(2)
-    return builder.as_markup()
+    return with_cancel(builder, "exercise_new").as_markup()
 
 
 EQUIPMENT_BY_VALUE = {member.value: member for member in Equipment}

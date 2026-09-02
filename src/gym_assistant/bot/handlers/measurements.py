@@ -11,6 +11,7 @@ from aiogram.types import Message
 from aiogram.utils.media_group import MediaGroupBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant.bot.keyboards import cancel_keyboard
 from gym_assistant.bot.states import WeightEntry
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.domain.models import User
@@ -74,15 +75,17 @@ async def prompt_weight(
     last = await service.latest_weigh_in(user.id)
     await state.set_state(WeightEntry.value)
 
+    keyboard = cancel_keyboard("weight").as_markup()
     if last is not None and last.weight_kg is not None:
         await message.answer(
             ru.WEIGHT_PROMPT_WITH_LAST.format(
                 last=render.format_decimal(last.weight_kg),
                 when=render.format_when(last.measured_at),
-            )
+            ),
+            reply_markup=keyboard,
         )
     else:
-        await message.answer(ru.WEIGHT_PROMPT)
+        await message.answer(ru.WEIGHT_PROMPT, reply_markup=keyboard)
 
 
 @router.message(WeightEntry.value)

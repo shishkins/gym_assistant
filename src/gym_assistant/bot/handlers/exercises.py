@@ -14,11 +14,12 @@ from gym_assistant.bot.keyboards import (
     TYPE_BY_VALUE,
     ExCardCB,
     ExFavCB,
-    ExGroupCB,
     ExHideCB,
+    ExListCB,
     ExMenuCB,
     ExNewCB,
     ExUnhideCB,
+    cancel_keyboard,
     exercise_card_keyboard,
     exercise_list_keyboard,
     groups_keyboard,
@@ -26,12 +27,11 @@ from gym_assistant.bot.keyboards import (
     new_equipment_keyboard,
     new_group_keyboard,
     new_type_keyboard,
-    search_results_keyboard,
     undo_hide_keyboard,
 )
 from gym_assistant.bot.states import ExerciseCreate, ExerciseSearch
 from gym_assistant.bot.texts import render, ru
-from gym_assistant.domain.models import User
+from gym_assistant.domain.models import Exercise, User
 from gym_assistant.domain.services import DuplicateExerciseError, ExerciseService
 
 log = structlog.get_logger(__name__)
@@ -39,10 +39,9 @@ router = Router(name="exercises")
 
 NAME_MIN_LENGTH = 3
 NAME_MAX_LENGTH = 80
-SEARCH_LIMIT = 8
-# Telegram renders a taller keyboard fine, but a list you have to scroll
-# past the message box stops being scannable.
-GROUP_PAGE_SIZE = 8
+# Telegram renders a taller keyboard, but a list you scroll past the message
+# box stops being scannable - and an unbounded one is eventually refused.
+PAGE_SIZE = 8
 
 
 async def _edit(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup) -> None:
@@ -53,8 +52,8 @@ async def _edit(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup
     try:
         await message.edit_text(text, reply_markup=markup)
     except Exception:
-        # Telegram rejects an edit that changes nothing, and the message may
-        # be too old to edit. Neither is worth failing the interaction over.
+        # Telegram rejects an edit that changes nothing, and a message may be
+        # too old to edit. Neither is worth failing the interaction over.
         log.debug("catalogue_edit_failed")
         await message.answer(text, reply_markup=markup)
 
@@ -62,6 +61,102 @@ async def _edit(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup
 async def _menu_text(service: ExerciseService, user: User) -> str:
     stats = await service.stats(user.id)
     return ru.EXERCISES_MENU.format(total=stats.total, own=stats.own, favourites=stats.favourites)
+
+
+async def show_menu(
+    message: Message, state: FSMContext, service: ExerciseService, user: User
+) -> None:
+    """Opens the catalogue and leaves search armed.
+
+    Search being armed is the point: the catalogue is something you dip into
+    repeatedly during a session, and retyping the command each time is friction.
+    """
+    await state.set_state(ExerciseSearch.query)
+    await message.answer(await _menu_text(service, user), reply_markup=menu_keyboard())
+
+
+# --- Paged lists ----------------------------------------------------------
+
+
+async def _count(service: ExerciseService, user: User, *, kind: str, ref: int, query: str) -> int:
+    if kind == "group":
+        return await service.count_by_muscle_group(ref, user_id=user.id)
+    if kind == "favourites":
+        return await service.count_favourites(user.id)
+    if kind == "own":
+        return await service.count_own(user.id)
+    return await service.count_search(query, user_id=user.id)
+
+
+async def _fetch(
+    service: ExerciseService, user: User, *, kind: str, ref: int, query: str, offset: int
+) -> list[Exercise]:
+    if kind == "group":
+        return await service.by_muscle_group(ref, user_id=user.id, limit=PAGE_SIZE, offset=offset)
+    if kind == "favourites":
+        return await service.favourites(user.id, limit=PAGE_SIZE, offset=offset)
+    if kind == "own":
+        return await service.own(user.id, limit=PAGE_SIZE, offset=offset)
+    return await service.search(query, user_id=user.id, limit=PAGE_SIZE, offset=offset)
+
+
+async def _list_view(
+    service: ExerciseService,
+    user: User,
+    *,
+    kind: str,
+    ref: int = 0,
+    page: int = 0,
+    query: str = "",
+) -> tuple[str, InlineKeyboardMarkup]:
+    """Renders any exercise list.
+
+    Every list goes through one function so that paging cannot be added to
+    one of them and forgotten on the next - which is exactly what happened
+    when only muscle groups were paged.
+    """
+    total = await _count(service, user, kind=kind, ref=ref, query=query)
+    total_pages = max(1, -(-total // PAGE_SIZE))
+    page = min(max(page, 0), total_pages - 1)
+
+    if total == 0:
+        if kind == "favourites":
+            return ru.EXERCISES_FAVOURITES_EMPTY, menu_keyboard()
+        if kind == "own":
+            return ru.EXERCISES_OWN_EMPTY, menu_keyboard()
+        if kind == "search":
+            return ru.EXERCISES_SEARCH_EMPTY.format(query=query), menu_keyboard()
+        return ru.EXERCISES_GROUP_EMPTY, groups_keyboard(await service.muscle_groups())
+
+    items = await _fetch(service, user, kind=kind, ref=ref, query=query, offset=page * PAGE_SIZE)
+
+    if kind == "group":
+        groups = {group.id: group for group in await service.muscle_groups()}
+        header = ru.EXERCISES_GROUP_RESULTS.format(group=groups[ref].name_ru)
+        back_action, back_label = "groups", None
+    elif kind == "favourites":
+        header, back_action, back_label = ru.EXERCISES_FAVOURITES, "menu", None
+    elif kind == "own":
+        header, back_action, back_label = ru.EXERCISES_OWN, "menu", None
+    else:
+        header = ru.EXERCISES_SEARCH_RESULTS.format(query=query)
+        back_action, back_label = "menu", ru.BTN_EXIT_SEARCH
+
+    if total_pages > 1:
+        first = page * PAGE_SIZE + 1
+        header += "\n\n" + ru.LIST_COUNTER.format(
+            shown=f"{first}–{first + len(items) - 1}", total=total
+        )
+
+    return header, exercise_list_keyboard(
+        items,
+        kind=kind,
+        ref=ref,
+        page=page,
+        total_pages=total_pages,
+        back_action=back_action,
+        back_label=back_label,
+    )
 
 
 async def _show_card(
@@ -94,40 +189,13 @@ async def cmd_exercises(
     service = ExerciseService(session)
 
     if command.args:
-        await _answer_search(message, service, user, command.args)
-        # An inline query is a one-off lookup, but staying armed means the
-        # next thought can be typed straight in without the command again.
         await state.set_state(ExerciseSearch.query)
+        await state.update_data(search_query=command.args)
+        text, markup = await _list_view(service, user, kind="search", query=command.args)
+        await message.answer(text, reply_markup=markup)
         return
 
     await show_menu(message, state, service, user)
-
-
-async def show_menu(
-    message: Message, state: FSMContext, service: ExerciseService, user: User
-) -> None:
-    """Opens the catalogue and leaves search armed.
-
-    Search being armed is the point: the catalogue is something you dip into
-    repeatedly during a session, and re-typing /exercises each time is friction.
-    """
-    await state.set_state(ExerciseSearch.query)
-    await message.answer(await _menu_text(service, user), reply_markup=menu_keyboard())
-
-
-async def _answer_search(
-    message: Message, service: ExerciseService, user: User, query: str
-) -> None:
-    found = await service.search(query, user_id=user.id, limit=SEARCH_LIMIT)
-    if not found:
-        await message.answer(
-            ru.EXERCISES_SEARCH_EMPTY.format(query=query), reply_markup=menu_keyboard()
-        )
-        return
-    await message.answer(
-        ru.EXERCISES_SEARCH_RESULTS.format(query=query),
-        reply_markup=search_results_keyboard(found),
-    )
 
 
 # --- Menu navigation ------------------------------------------------------
@@ -159,18 +227,12 @@ async def menu_action(
             )
 
         case "favourites":
-            favourites = await service.favourites(user.id)
-            if not favourites:
-                await _edit(callback, ru.EXERCISES_FAVOURITES_EMPTY, menu_keyboard())
-            else:
-                await _edit(callback, ru.EXERCISES_FAVOURITES, exercise_list_keyboard(favourites))
+            text, markup = await _list_view(service, user, kind="favourites")
+            await _edit(callback, text, markup)
 
         case "own":
-            own = await service.own(user.id)
-            if not own:
-                await _edit(callback, ru.EXERCISES_OWN_EMPTY, menu_keyboard())
-            else:
-                await _edit(callback, ru.EXERCISES_OWN, exercise_list_keyboard(own))
+            text, markup = await _list_view(service, user, kind="own")
+            await _edit(callback, text, markup)
 
         case "search":
             await state.set_state(ExerciseSearch.query)
@@ -182,42 +244,34 @@ async def menu_action(
             await state.set_state(ExerciseCreate.name)
             message = callback.message
             if isinstance(message, Message):
-                await message.answer(ru.EXERCISE_NEW_NAME)
+                await message.answer(
+                    ru.EXERCISE_NEW_NAME,
+                    reply_markup=cancel_keyboard("exercise_new").as_markup(),
+                )
 
 
-@router.callback_query(ExGroupCB.filter())
-async def open_group(
-    callback: CallbackQuery, callback_data: ExGroupCB, session: AsyncSession, user: User
+@router.callback_query(ExListCB.filter())
+async def list_page(
+    callback: CallbackQuery,
+    callback_data: ExListCB,
+    state: FSMContext,
+    session: AsyncSession,
+    user: User,
 ) -> None:
-    service = ExerciseService(session)
+    """One handler for every paged list."""
     await callback.answer()
-
-    total = await service.count_by_muscle_group(callback_data.group_id, user_id=user.id)
-    if not total:
-        await _edit(
-            callback, ru.EXERCISES_GROUP_EMPTY, groups_keyboard(await service.muscle_groups())
-        )
-        return
-
-    total_pages = max(1, -(-total // GROUP_PAGE_SIZE))
-    page = min(max(callback_data.page, 0), total_pages - 1)
-
-    exercises = await service.by_muscle_group(
-        callback_data.group_id,
-        user_id=user.id,
-        limit=GROUP_PAGE_SIZE,
-        offset=page * GROUP_PAGE_SIZE,
+    # The search term lives in FSM data: a Cyrillic query does not reliably
+    # fit in the 64 bytes Telegram allows for callback data.
+    data = await state.get_data()
+    text, markup = await _list_view(
+        ExerciseService(session),
+        user,
+        kind=callback_data.kind,
+        ref=callback_data.ref,
+        page=callback_data.page,
+        query=data.get("search_query", ""),
     )
-    groups = {group.id: group for group in await service.muscle_groups()}
-    await _edit(
-        callback,
-        ru.EXERCISES_GROUP_RESULTS.format(group=groups[callback_data.group_id].name_ru),
-        exercise_list_keyboard(
-            exercises,
-            back_action="groups",
-            pager=(callback_data.group_id, page, total_pages),
-        ),
-    )
+    await _edit(callback, text, markup)
 
 
 @router.callback_query(ExCardCB.filter())
@@ -254,11 +308,7 @@ async def hide_exercise(
     name = exercise.name_ru
     await service.set_hidden(user.id, exercise.id, hidden=True)
     await callback.answer()
-    await _edit(
-        callback,
-        ru.EXERCISE_HIDDEN.format(name=name),
-        undo_hide_keyboard(exercise.id),
-    )
+    await _edit(callback, ru.EXERCISE_HIDDEN.format(name=name), undo_hide_keyboard(exercise.id))
 
 
 @router.callback_query(ExUnhideCB.filter())
@@ -271,11 +321,7 @@ async def unhide_exercise(
     await callback.answer()
     if exercise is None:
         return
-    await _edit(
-        callback,
-        ru.EXERCISE_RESTORED.format(name=exercise.name_ru),
-        menu_keyboard(),
-    )
+    await _edit(callback, ru.EXERCISE_RESTORED.format(name=exercise.name_ru), menu_keyboard())
 
 
 # --- Search ---------------------------------------------------------------
@@ -288,8 +334,13 @@ async def search_entered(
     if not message.text:
         await message.answer(ru.EXERCISES_SEARCH_PROMPT)
         return
+
     # State is deliberately kept: the next message searches again.
-    await _answer_search(message, ExerciseService(session), user, message.text)
+    await state.update_data(search_query=message.text)
+    text, markup = await _list_view(
+        ExerciseService(session), user, kind="search", query=message.text
+    )
+    await message.answer(text, reply_markup=markup)
 
 
 # --- Creating a personal exercise ----------------------------------------
@@ -298,12 +349,13 @@ async def search_entered(
 @router.message(ExerciseCreate.name)
 async def new_name_entered(message: Message, state: FSMContext, session: AsyncSession) -> None:
     name = " ".join((message.text or "").split())
+    keyboard = cancel_keyboard("exercise_new").as_markup()
 
     if len(name) < NAME_MIN_LENGTH:
-        await message.answer(ru.EXERCISE_NAME_TOO_SHORT)
+        await message.answer(ru.EXERCISE_NAME_TOO_SHORT, reply_markup=keyboard)
         return
     if len(name) > NAME_MAX_LENGTH:
-        await message.answer(ru.EXERCISE_NAME_TOO_LONG)
+        await message.answer(ru.EXERCISE_NAME_TOO_LONG, reply_markup=keyboard)
         return
 
     await state.update_data(name=name)

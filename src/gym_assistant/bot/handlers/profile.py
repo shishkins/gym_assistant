@@ -14,6 +14,7 @@ from gym_assistant.bot.keyboards import (
     CHOICE_ENUMS,
     ChoiceCB,
     EditCB,
+    cancel_keyboard,
     experience_keyboard,
     goal_keyboard,
     profile_keyboard,
@@ -63,7 +64,7 @@ async def edit_requested(
 
     if field == "weight":
         await state.set_state(WeightEntry.value)
-        await message.answer(ru.WEIGHT_PROMPT)
+        await message.answer(ru.WEIGHT_PROMPT, reply_markup=cancel_keyboard("weight").as_markup())
         return
 
     if field in CHOICE_KEYBOARDS:
@@ -77,7 +78,10 @@ async def edit_requested(
 
     await state.set_state(ProfileEdit.value)
     await state.update_data(field=field)
-    await message.answer(ru.PROFILE_FIELD_PROMPTS[field])
+    await message.answer(
+        ru.PROFILE_FIELD_PROMPTS[field],
+        reply_markup=cancel_keyboard("profile_edit").as_markup(),
+    )
 
 
 @router.callback_query(ChoiceCB.filter())
