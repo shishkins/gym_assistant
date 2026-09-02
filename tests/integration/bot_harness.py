@@ -113,7 +113,24 @@ class RecordingSession(BaseSession):
         )
 
     def clear(self) -> None:
+        """Forgets what was sent, but keeps the last keyboard tappable.
+
+        Clearing before a tap is the natural way to write "assert only what
+        happens next", and dropping the keyboard with it made the next
+        tap_button fail for a reason that had nothing to do with the code
+        under test. Twice.
+        """
+        keyboard = next(
+            (
+                call
+                for call in reversed(self.calls)
+                if isinstance(getattr(call, "reply_markup", None), InlineKeyboardMarkup)
+            ),
+            None,
+        )
         self.calls.clear()
+        if keyboard is not None:
+            self.calls.append(keyboard)
 
 
 CHAT_ID = 555

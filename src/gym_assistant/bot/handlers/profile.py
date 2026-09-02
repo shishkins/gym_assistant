@@ -10,6 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant.analytics.metrics import personal_records
 from gym_assistant.bot.keyboards import (
     CHOICE_ENUMS,
     ChoiceCB,
@@ -28,6 +29,7 @@ from gym_assistant.domain.parsing import (
     parse_birth_date,
     parse_height,
 )
+from gym_assistant.domain.repositories import StatsRepository
 from gym_assistant.domain.services import ProfileService
 
 router = Router(name="profile")
@@ -40,9 +42,31 @@ CHOICE_KEYBOARDS = {
 }
 
 
+# Enough to answer "am I getting stronger" at a glance; the rest is /stats.
+PROFILE_RECORD_COUNT = 3
+
+
 async def show_card(message: Message, session: AsyncSession, user: User) -> None:
     summary = await ProfileService(session).get_summary(user.id, today=date.today())
-    await message.answer(render.render_profile(summary), reply_markup=profile_keyboard())
+    text = render.render_profile(summary)
+
+    # Requested during the iteration 3 review: the maxima belong on the card,
+    # not only behind a report.
+    sets = await StatsRepository(session).sets_with_exercises(user.id)
+    records = personal_records(sets)[:PROFILE_RECORD_COUNT]
+    if records:
+        text += ru.PROFILE_RECORDS.format(
+            records="\n".join(
+                ru.PROFILE_RECORD_LINE.format(
+                    name=record.exercise_name,
+                    weight=render.format_decimal(record.best_weight) if record.best_weight else "—",
+                    reps=record.best_weight_reps or "—",
+                )
+                for record in records
+            )
+        )
+
+    await message.answer(text, reply_markup=profile_keyboard())
 
 
 @router.message(Command("profile"))

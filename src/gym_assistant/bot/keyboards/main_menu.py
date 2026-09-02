@@ -14,7 +14,7 @@ from gym_assistant.bot.texts import ru
 
 
 class MainMenuCB(CallbackData, prefix="main"):
-    action: str  # workout | exercises | profile | weight | photos | help
+    action: str  # workout | stats | exercises | profile | weight | photos | help
 
 
 def main_menu_keyboard() -> InlineKeyboardMarkup:
@@ -22,9 +22,10 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     # Ordered by how often it gets used, not by when it was built.
     builder.button(text=ru.BTN_MENU_WORKOUT, callback_data=MainMenuCB(action="workout"))
     builder.button(text=ru.BTN_MENU_EXERCISES, callback_data=MainMenuCB(action="exercises"))
+    builder.button(text=ru.BTN_MENU_STATS, callback_data=MainMenuCB(action="stats"))
     builder.button(text=ru.BTN_MENU_WEIGHT, callback_data=MainMenuCB(action="weight"))
     builder.button(text=ru.BTN_MENU_PHOTOS, callback_data=MainMenuCB(action="photos"))
     builder.button(text=ru.BTN_MENU_PROFILE, callback_data=MainMenuCB(action="profile"))
     builder.button(text=ru.BTN_MENU_HELP, callback_data=MainMenuCB(action="help"))
-    builder.adjust(1, 2, 2, 1)
+    builder.adjust(1, 2, 2, 2)
     return builder.as_markup()

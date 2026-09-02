@@ -20,6 +20,7 @@ from gym_assistant.bot.handlers import (
     menu,
     onboarding,
     profile,
+    stats,
     workouts,
 )
 
@@ -32,6 +33,7 @@ def get_routers() -> tuple[Router, ...]:
         profile.router,
         measurements.router,
         workouts.router,
+        stats.router,
         exercises.router,
         fallback.router,
     )
