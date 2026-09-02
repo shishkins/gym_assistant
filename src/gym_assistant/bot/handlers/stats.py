@@ -23,24 +23,29 @@ from gym_assistant.analytics.metrics import (
 from gym_assistant.bot.keyboards.stats import (
     StatsCB,
     StatsExerciseCB,
+    StatsLastCB,
     StatsPeriodCB,
+    StatsPickCB,
     exercise_picker,
     menu_keyboard,
     period_keyboard,
+    records_keyboard,
     report_keyboard,
 )
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.domain.models import User
 from gym_assistant.domain.repositories import MeasurementRepository, StatsRepository
-from gym_assistant.domain.services import ExerciseService
+from gym_assistant.domain.services import ExerciseService, WorkoutService
 
 log = structlog.get_logger(__name__)
 router = Router(name="stats")
 
 DEFAULT_PERIOD = "3m"
 PERIOD_DAYS = {"1m": 30, "3m": 90, "6m": 180, "1y": 365, "all": None}
-# A picker longer than this stops being a picker.
-PICKER_LIMIT = 12
+# A picker longer than this stops being a picker - but truncating it silently,
+# as this did, hides every exercise past the twelfth. Both lists page instead.
+PICKER_PAGE_SIZE = 8
+RECORDS_PAGE_SIZE = 8
 
 
 def _since(period: str) -> datetime | None:
@@ -61,15 +66,28 @@ async def _menu(session: AsyncSession, user: User, period: str) -> tuple[str, In
 
 
 async def _send(
-    message: Message, image: bytes | None, report: str, period: str, *, empty: str
+    message: Message,
+    image: bytes | None,
+    report: str,
+    period: str,
+    *,
+    empty: str,
+    exercise_id: int = 0,
+    thin: bool = False,
 ) -> None:
-    """Sends a chart, or says plainly why there is none."""
-    keyboard = report_keyboard(report, period)
+    """Sends a chart, or says plainly why there is none.
+
+    ``thin`` marks a picture built from a single point: it is drawn, because a
+    dot beats a refusal, but the caption says not to read a trend into it.
+    """
+    keyboard = report_keyboard(report, period, exercise_id)
     if image is None:
         await message.answer(empty, reply_markup=keyboard)
         return
     await message.answer_photo(
-        BufferedInputFile(image, filename=f"{report}.png"), reply_markup=keyboard
+        BufferedInputFile(image, filename=f"{report}.png"),
+        caption=ru.STATS_THIN if thin else None,
+        reply_markup=keyboard,
     )
 
 
@@ -106,8 +124,45 @@ async def choose_period(callback: CallbackQuery, callback_data: StatsPeriodCB) -
     if isinstance(message, Message):
         await message.answer(
             ru.BTN_STATS_PERIOD.format(period=ru.STATS_PERIOD_LABELS[callback_data.period]),
-            reply_markup=period_keyboard(callback_data.report, callback_data.period),
+            reply_markup=period_keyboard(
+                callback_data.report, callback_data.period, callback_data.exercise_id
+            ),
         )
+
+
+async def _picker(
+    message: Message, session: AsyncSession, user: User, period: str, page: int
+) -> None:
+    used = await StatsRepository(session).exercises_used(user.id)
+    if not used:
+        await message.answer(ru.STATS_NO_EXERCISES)
+        return
+
+    total_pages = max(1, -(-len(used) // PICKER_PAGE_SIZE))
+    page = min(max(page, 0), total_pages - 1)
+    offset = page * PICKER_PAGE_SIZE
+    await message.answer(
+        ru.STATS_PICK_EXERCISE,
+        reply_markup=exercise_picker(
+            used[offset : offset + PICKER_PAGE_SIZE],
+            period,
+            page=page,
+            total_pages=total_pages,
+        ),
+    )
+
+
+@router.callback_query(StatsPickCB.filter())
+async def pick_exercise(
+    callback: CallbackQuery,
+    callback_data: StatsPickCB,
+    session: AsyncSession,
+    user: User,
+) -> None:
+    await callback.answer()
+    message = callback.message
+    if isinstance(message, Message):
+        await _picker(message, session, user, callback_data.period, callback_data.page)
 
 
 @router.callback_query(StatsCB.filter())
@@ -133,14 +188,7 @@ async def report(
             await message.answer(text, reply_markup=markup)
 
         case "progress":
-            used = await stats.exercises_used(user.id)
-            if not used:
-                await message.answer(ru.STATS_NO_EXERCISES)
-                return
-            await message.answer(
-                ru.STATS_PICK_EXERCISE,
-                reply_markup=exercise_picker(used[:PICKER_LIMIT], period),
-            )
+            await _picker(message, session, user, period, callback_data.page)
 
         case "tonnage":
             weeks = await stats.weekly_tonnage(user.id, since=since)
@@ -150,16 +198,19 @@ async def report(
                 "tonnage",
                 period,
                 empty=ru.STATS_NOT_ENOUGH.format(period=label),
+                thin=len(weeks) == 1,
             )
 
         case "volume":
             sets = await stats.sets_with_exercises(user.id, since=since)
+            volume = weekly_volume_by_group(sets)
             await _send(
                 message,
-                charts.muscle_volume_chart(weekly_volume_by_group(sets)),
+                charts.muscle_volume_chart(volume),
                 "volume",
                 period,
                 empty=ru.STATS_NOT_ENOUGH.format(period=label),
+                thin=len(volume) == 1,
             )
 
         case "weight":
@@ -177,6 +228,7 @@ async def report(
                 "weight",
                 period,
                 empty=ru.STATS_NOT_ENOUGH.format(period=label),
+                thin=len(points) == 1,
             )
 
         case "frequency":
@@ -187,10 +239,11 @@ async def report(
                 "frequency",
                 period,
                 empty=ru.STATS_NOT_ENOUGH.format(period=label),
+                thin=len(days) == 1,
             )
 
         case "records":
-            await _records(message, session, user, period)
+            await _records(message, session, user, period, callback_data.page)
 
         case "summary":
             await _summary(message, session, user, period)
@@ -221,29 +274,65 @@ async def exercise_progress(
     sets = await StatsRepository(session).sets_of_exercise(
         user.id, exercise.id, since=_since(period)
     )
+    points = compute_progress(sets)
     await _send(
         message,
-        charts.exercise_progress_chart(exercise.name_ru, compute_progress(sets)),
+        charts.exercise_progress_chart(exercise.name_ru, points),
         "progress",
         period,
         empty=ru.STATS_NOT_ENOUGH.format(period=ru.STATS_PERIOD_LABELS[period]),
+        exercise_id=exercise.id,
+        thin=len(points) == 1,
     )
+
+
+@router.callback_query(StatsLastCB.filter())
+async def last_with_exercise(
+    callback: CallbackQuery,
+    callback_data: StatsLastCB,
+    session: AsyncSession,
+    user: User,
+) -> None:
+    """The sets behind the last point on the chart.
+
+    Asked for during the iteration 4 review: a curve says the weight went up,
+    but not how the session that produced it actually went.
+    """
+    await callback.answer()
+    message = callback.message
+    if not isinstance(message, Message):
+        return
+
+    summary = await WorkoutService(session).last_completed_with(user.id, callback_data.exercise_id)
+    keyboard = report_keyboard("progress", callback_data.period, callback_data.exercise_id)
+    if summary is None:
+        await message.answer(ru.STATS_LAST_WITH_NONE, reply_markup=keyboard)
+        return
+
+    header = ru.WORKOUT_LAST_HEADER.format(when=render.format_when(summary.workout.started_at))
+    await message.answer(header + render.render_workout_summary(summary), reply_markup=keyboard)
 
 
 # --- text reports ---------------------------------------------------------
 
 
-async def _records(message: Message, session: AsyncSession, user: User, period: str) -> None:
+async def _records(
+    message: Message, session: AsyncSession, user: User, period: str, page: int = 0
+) -> None:
     sets = await StatsRepository(session).sets_with_exercises(user.id)
     records = personal_records(sets)
     if not records:
-        await message.answer(
-            ru.STATS_RECORDS_EMPTY, reply_markup=report_keyboard("records", period)
-        )
+        await message.answer(ru.STATS_RECORDS_EMPTY, reply_markup=records_keyboard(period))
         return
 
+    # Everything ever lifted goes in this list, and Telegram refuses a message
+    # over 4096 characters - so it pages rather than silently losing the tail.
+    total_pages = max(1, -(-len(records) // RECORDS_PAGE_SIZE))
+    page = min(max(page, 0), total_pages - 1)
+    offset = page * RECORDS_PAGE_SIZE
+
     lines = []
-    for record in records:
+    for record in records[offset : offset + RECORDS_PAGE_SIZE]:
         line = ru.STATS_RECORDS_LINE.format(
             name=record.exercise_name,
             weight=render.format_decimal(record.best_weight) if record.best_weight else "—",
@@ -256,9 +345,10 @@ async def _records(message: Message, session: AsyncSession, user: User, period: 
             )
         lines.append(line)
 
+    counter = f" · {page + 1}/{total_pages}" if total_pages > 1 else ""
     await message.answer(
-        ru.STATS_RECORDS_HEADER + "\n\n".join(lines),
-        reply_markup=report_keyboard("records", period),
+        ru.STATS_RECORDS_HEADER.format(page=counter) + "\n\n".join(lines),
+        reply_markup=records_keyboard(period, page=page, total_pages=total_pages),
     )
 
 

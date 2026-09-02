@@ -34,9 +34,15 @@ from gym_assistant.analytics.style import (
     new_figure,
 )
 
-# A single point is a dot, not a trend. Charts that would say nothing are not
-# drawn at all.
-MIN_POINTS = 2
+# Nothing at all is the only case worth refusing. A single point is a poor
+# trend but an honest picture, and refusing it means a new user sees the words
+# "данных слишком мало" for their first fortnight - which reads as a broken
+# bot, not as patience. Raised from two after the iteration 4 review.
+MIN_POINTS = 1
+
+# Below this a line says more about the last session than about progress, so
+# the trend is left off rather than invented.
+MIN_POINTS_FOR_TREND = 3
 
 
 def _to_png(figure: Figure) -> bytes:
@@ -77,10 +83,8 @@ def exercise_progress_chart(name: str, points: Sequence[ProgressPoint]) -> bytes
         alpha=0.9,
     )
 
-    # A trend needs enough points to mean anything; below that the line says
-    # more about the last session than about progress.
     usable = [(index, value) for index, value in enumerate(weights) if not np.isnan(value)]
-    if len(usable) >= 3:
+    if len(usable) >= MIN_POINTS_FOR_TREND:
         xs = np.array([index for index, _ in usable], dtype=float)
         ys = np.array([value for _, value in usable], dtype=float)
         slope, intercept = np.polyfit(xs, ys, 1)
@@ -107,17 +111,19 @@ def weekly_tonnage_chart(weeks: Sequence[tuple[date, Decimal]]) -> bytes | None:
     axes.set_ylabel("кг за неделю")
     axes.tick_params(axis="x", rotation=45)
 
-    average = sum(values) / len(values)
-    axes.axhline(average, color=MUTED, linestyle=":", linewidth=1.2)
-    axes.text(
-        len(labels) - 0.4,
-        average,
-        f"среднее {average:,.0f}".replace(",", " "),
-        color=MUTED,
-        fontsize=9,
-        va="bottom",
-        ha="right",
-    )
+    # An average drawn through a single bar is the bar again, labelled twice.
+    if len(values) > 1:
+        average = sum(values) / len(values)
+        axes.axhline(average, color=MUTED, linestyle=":", linewidth=1.2)
+        axes.text(
+            len(labels) - 0.4,
+            average,
+            f"среднее {average:,.0f}".replace(",", " "),
+            color=MUTED,
+            fontsize=9,
+            va="bottom",
+            ha="right",
+        )
     return _to_png(figure)
 
 

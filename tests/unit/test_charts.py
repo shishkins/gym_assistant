@@ -10,8 +10,6 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
-import pytest
-
 from gym_assistant.analytics import charts
 from gym_assistant.analytics.metrics import ProgressPoint, moving_average
 
@@ -87,28 +85,53 @@ def test_frequency_chart_is_a_png() -> None:
 # --- what deliberately is not drawn --------------------------------------
 
 
-@pytest.mark.parametrize("count", [0, 1])
-def test_progress_chart_refuses_too_few_points(count: int) -> None:
-    """One point is a dot, not a trend; a sentence beats an empty chart."""
-    assert charts.exercise_progress_chart("Жим", _progress(count)) is None
+def test_progress_chart_refuses_no_points() -> None:
+    """Nothing at all is the only case worth refusing."""
+    assert charts.exercise_progress_chart("Жим", _progress(0)) is None
 
 
-@pytest.mark.parametrize("count", [0, 1])
-def test_tonnage_chart_refuses_too_few_weeks(count: int) -> None:
-    assert charts.weekly_tonnage_chart(_weeks(count)) is None
+def test_tonnage_chart_refuses_no_weeks() -> None:
+    assert charts.weekly_tonnage_chart(_weeks(0)) is None
 
 
 def test_volume_chart_refuses_empty_data() -> None:
     assert charts.muscle_volume_chart({}) is None
 
 
-def test_body_weight_chart_refuses_a_single_reading() -> None:
+def test_frequency_chart_refuses_no_days() -> None:
+    assert charts.frequency_chart([]) is None
+
+
+# --- the first session must still show something -------------------------
+#
+# Raised from two points to one after the iteration 4 review: a new user was
+# told "данных слишком мало" for their whole first fortnight, which reads as
+# a broken bot rather than as patience.
+
+
+def test_progress_chart_draws_a_single_point() -> None:
+    image = charts.exercise_progress_chart("Жим", _progress(1))
+    assert image is not None and image.startswith(PNG_MAGIC)
+
+
+def test_tonnage_chart_draws_a_single_week() -> None:
+    image = charts.weekly_tonnage_chart(_weeks(1))
+    assert image is not None and image.startswith(PNG_MAGIC)
+
+
+def test_body_weight_chart_draws_a_single_reading() -> None:
     points = [(MONDAY, Decimal("84"))]
-    assert charts.body_weight_chart(points, moving_average(points)) is None
+    image = charts.body_weight_chart(points, moving_average(points))
+    assert image is not None and image.startswith(PNG_MAGIC)
 
 
-def test_frequency_chart_refuses_a_single_day() -> None:
-    assert charts.frequency_chart([(MONDAY, 12)]) is None
+def test_frequency_chart_draws_a_single_day() -> None:
+    image = charts.frequency_chart([(MONDAY, 12)])
+    assert image is not None and image.startswith(PNG_MAGIC)
+
+
+def test_body_weight_chart_refuses_no_readings() -> None:
+    assert charts.body_weight_chart([], []) is None
 
 
 # --- properties that must hold -------------------------------------------

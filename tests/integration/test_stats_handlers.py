@@ -13,9 +13,12 @@ from decimal import Decimal
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant.bot.texts import ru
 from gym_assistant.config import Settings
+from gym_assistant.domain.models import Exercise
 from gym_assistant.domain.parsing import parse_set_entry
 from gym_assistant.domain.services import (
     ExerciseService,
@@ -69,6 +72,38 @@ async def _seed_weight(session: AsyncSession, *, points: int = 10) -> None:
             weight_kg=Decimal(84) - Decimal(index) / 10,
             measured_at=start + timedelta(days=index * 3),
         )
+
+
+async def _seed_many_exercises(session: AsyncSession, *, count: int = 11) -> None:
+    """More exercises than fit on one page of the picker or the records list."""
+    user = await ProfileService(session).get_or_create_user(TELEGRAM_ID)
+    picked = list(
+        await session.scalars(
+            select(Exercise)
+            .where(Exercise.owner_user_id.is_(None))
+            .order_by(Exercise.id)
+            .limit(count)
+        )
+    )
+    workouts = WorkoutService(session)
+    when = datetime.now(UTC) - timedelta(days=2)
+    await workouts.start(user.id, now=when)
+    for index, exercise in enumerate(picked):
+        await workouts.log(user.id, exercise, parse_set_entry(f"{50 + index}х5"), now=when)
+    await workouts.finish(user.id, now=when + timedelta(hours=1))
+
+
+def _exercise_labels(bot: BotHarness) -> set[str]:
+    """Everything on the keyboard that is not navigation."""
+    markup = bot.session.last_markup
+    assert markup is not None
+    chrome = {ru.BTN_BACK, ru.BTN_PREV_PAGE, ru.BTN_NEXT_PAGE, " "}
+    return {
+        button.text
+        for row in markup.inline_keyboard
+        for button in row
+        if button.text not in chrome and "/" not in button.text
+    }
 
 
 def _photos_sent(bot: BotHarness) -> int:
@@ -185,10 +220,10 @@ async def test_progress_without_any_history(bot: BotHarness) -> None:
     assert "нечего показывать" in bot.session.last_text
 
 
-async def test_a_single_session_is_not_enough_for_a_trend(
+async def test_a_single_session_still_draws_something(
     bot: BotHarness, session: AsyncSession
 ) -> None:
-    """One point is a dot; the chart must refuse rather than mislead."""
+    """The complaint from iteration 4: one session must not be a blank refusal."""
     await _seed_history(session, weeks=1)
     await bot.send("/stats")
     await bot.tap_button("Динамика упражнения")
@@ -196,8 +231,20 @@ async def test_a_single_session_is_not_enough_for_a_trend(
     bot.session.clear()
     await bot.tap_button("Жим штанги лёжа")
 
-    assert _photos_sent(bot) == 0
-    assert "мало" in bot.session.last_text
+    assert _photos_sent(bot) == 1
+
+
+async def test_a_single_point_is_labelled_as_one(bot: BotHarness, session: AsyncSession) -> None:
+    """Drawn, but captioned so a dot is not mistaken for a trend."""
+    await _seed_history(session, weeks=1)
+    await bot.send("/stats")
+    await bot.tap_button("Динамика упражнения")
+
+    bot.session.clear()
+    await bot.tap_button("Жим штанги лёжа")
+
+    photo = next(call for call in bot.session.calls if type(call).__name__ == "SendPhoto")
+    assert "одна точка" in (photo.caption or "")
 
 
 # --- periods --------------------------------------------------------------
@@ -326,3 +373,106 @@ async def test_profile_without_history_has_no_maxima_block(bot: BotHarness) -> N
     await bot.send("/profile")
 
     assert "Максимумы" not in bot.session.last_text
+
+
+# --- pagination -----------------------------------------------------------
+#
+# Reported in the iteration 4 review: both of these lists grow with every
+# exercise ever trained, and neither of them paged.
+
+
+async def test_exercise_picker_pages(bot: BotHarness, session: AsyncSession) -> None:
+    await _seed_many_exercises(session)
+    await bot.send("/stats")
+
+    bot.session.clear()
+    await bot.tap_button("Динамика упражнения")
+
+    assert bot.session.button_with("1/2")
+    assert bot.session.button_with("›")
+
+
+async def test_exercise_picker_second_page_has_other_exercises(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    """The eleventh exercise used to be unreachable, silently."""
+    await _seed_many_exercises(session)
+    await bot.send("/stats")
+    await bot.tap_button("Динамика упражнения")
+    first = _exercise_labels(bot)
+
+    await bot.tap_button("›")
+    second = _exercise_labels(bot)
+
+    assert bot.session.button_with("2/2")
+    assert second and not (first & second)
+
+
+async def test_records_page(bot: BotHarness, session: AsyncSession) -> None:
+    await _seed_many_exercises(session)
+    await bot.send("/stats")
+
+    bot.session.clear()
+    await bot.tap_button("Личные рекорды")
+
+    assert "1/2" in bot.session.last_text
+    await bot.tap_button("›")
+    assert "2/2" in bot.session.last_text
+
+
+async def test_records_fit_within_telegram_limit(bot: BotHarness, session: AsyncSession) -> None:
+    """A message over 4096 characters is refused outright, not truncated."""
+    await _seed_many_exercises(session, count=30)
+    await bot.send("/stats")
+    await bot.tap_button("Личные рекорды")
+
+    assert len(bot.session.last_text) < 4096
+
+
+# --- the period keeps the exercise ----------------------------------------
+
+
+async def test_changing_the_period_keeps_the_exercise(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    """Reported in the review: it asked which exercise all over again."""
+    await _seed_history(session, weeks=6)
+    await bot.send("/stats")
+    await bot.tap_button("Динамика упражнения")
+    await bot.tap_button("Жим штанги лёжа")
+
+    await bot.tap_button("Период")
+    bot.session.clear()
+    await bot.tap_button("месяц")
+
+    assert _photos_sent(bot) == 1
+
+
+async def test_the_picker_is_still_one_tap_away(bot: BotHarness, session: AsyncSession) -> None:
+    await _seed_history(session, weeks=6)
+    await bot.send("/stats")
+    await bot.tap_button("Динамика упражнения")
+
+    bot.session.clear()
+    await bot.tap_button("Жим штанги лёжа")
+    await bot.tap_button("Другое упражнение")
+
+    assert "По какому упражнению" in bot.session.last_text
+
+
+# --- the session behind the chart -----------------------------------------
+
+
+async def test_last_session_with_the_exercise(bot: BotHarness, session: AsyncSession) -> None:
+    """Asked for in the review: show the sets behind the last point."""
+    await _seed_history(session, weeks=2)
+    await bot.send("/stats")
+    await bot.tap_button("Динамика упражнения")
+    await bot.tap_button("Жим штанги лёжа")
+
+    bot.session.clear()
+    await bot.tap_button("Последняя тренировка")
+
+    text = bot.session.last_text
+    assert "Жим штанги лёжа" in text
+    assert "Приседания со штангой" not in text

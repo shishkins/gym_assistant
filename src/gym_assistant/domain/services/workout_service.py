@@ -273,6 +273,10 @@ class WorkoutService:
         workout = await self._workouts.last_completed(user_id)
         return None if workout is None else await self.summary(workout)
 
+    async def last_completed_with(self, user_id: int, exercise_id: int) -> WorkoutSummary | None:
+        workout = await self._workouts.last_completed_with(user_id, exercise_id)
+        return None if workout is None else await self.summary(workout)
+
     async def frequent_exercises(self, user_id: int, *, limit: int = 6) -> list[Exercise]:
         ids = await self._workouts.frequent_exercise_ids(user_id, limit=limit)
         found = [await self._exercises.get(item, user_id=user_id) for item in ids]

@@ -47,6 +47,22 @@ class WorkoutRepository:
         workout: Workout | None = await self._session.scalar(stmt)
         return workout
 
+    async def last_completed_with(self, user_id: int, exercise_id: int) -> Workout | None:
+        """The most recent finished session that touched this exercise."""
+        stmt = (
+            select(Workout)
+            .join(WorkoutSet, WorkoutSet.workout_id == Workout.id)
+            .where(
+                Workout.user_id == user_id,
+                Workout.status == WorkoutStatus.COMPLETED.value,
+                WorkoutSet.exercise_id == exercise_id,
+            )
+            .order_by(Workout.started_at.desc())
+            .limit(1)
+        )
+        workout: Workout | None = await self._session.scalar(stmt)
+        return workout
+
     async def stale_open(self, older_than: datetime) -> list[Workout]:
         """Sessions left open long enough that they are certainly over."""
         stmt = select(Workout).where(

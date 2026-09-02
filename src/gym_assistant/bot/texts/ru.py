@@ -447,16 +447,22 @@ STATS_NO_EXERCISES = (
 )
 
 STATS_NOT_ENOUGH = (
-    "За период «{period}» данных слишком мало для графика.\n\n"
-    "Нужно хотя бы две точки. Попробуйте период побольше или запишите ещё тренировку."
+    "За период «{period}» рисовать нечего — нет ни одной записи.\n\n"
+    "Попробуйте период побольше или запишите тренировку."
 )
+
+# Shown under a chart built from a single day or week: the picture is honest,
+# but it is a dot, and saying so is cheaper than letting it look like a trend.
+STATS_THIN = "Пока одна точка. Со следующей тренировкой появится линия, с третьей — тренд."
 
 STATS_EMPTY = "За период «{period}» записей нет."
 
-STATS_RECORDS_HEADER = "🏆 <b>Личные рекорды</b>\n\n"
+STATS_RECORDS_HEADER = "🏆 <b>Личные рекорды</b>{page}\n\n"
 STATS_RECORDS_LINE = "<b>{name}</b>\n  {weight} кг × {reps} · {when}"
 STATS_RECORDS_ESTIMATE = "\n  <i>расчётный максимум {estimate} кг</i>"
 STATS_RECORDS_EMPTY = "Рекордов пока нет — они появятся, как только запишете подход с весом."
+
+STATS_LAST_WITH_NONE = "Завершённых тренировок с этим упражнением пока нет."
 
 STATS_SUMMARY = (
     "📊 <b>Итоги за {period}</b>\n\n"
@@ -491,4 +497,6 @@ BTN_STATS_FREQUENCY = "📅 Частота тренировок"
 BTN_STATS_SUMMARY = "🧮 Итоги"
 BTN_STATS_EXPORT = "⬇️ Выгрузить CSV"
 BTN_STATS_PERIOD = "🗓 Период: {period}"
+BTN_STATS_LAST_WITH = "📋 Последняя тренировка с ним"
+BTN_STATS_PICK_OTHER = "📈 Другое упражнение"
 BTN_MENU_STATS = "📊 Статистика"
