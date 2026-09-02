@@ -5,12 +5,15 @@ whether a chart is readable is not a testing strategy. This writes a history
 that looks like real training - progression, warm-ups, rest days, an
 occasional missed week - so the reports can be judged today.
 
-    uv run python scripts/demo_history.py            # 12 weeks
+    uv run python scripts/demo_history.py                    # add 12 weeks
     uv run python scripts/demo_history.py --weeks 24
-    uv run python scripts/demo_history.py --wipe     # remove it again
+    uv run python scripts/demo_history.py --wipe             # remove demo only
+    uv run python scripts/demo_history.py --reset            # start over
 
-Demo data is tagged in the workout note, so --wipe removes exactly what this
-script created and leaves real sessions alone.
+--wipe removes only what this script wrote: every row it creates is tagged in
+the note, so real sessions survive. --reset is the blunt one - it deletes the
+user and everything hanging off them, then recreates the profile and seeds a
+fresh history. Use it to get a clean, populated state for testing.
 """
 
 from __future__ import annotations
@@ -18,17 +21,34 @@ from __future__ import annotations
 import argparse
 import asyncio
 import random
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import delete, select
 
 from gym_assistant.config import get_settings
 from gym_assistant.db import create_engine, create_session_factory
-from gym_assistant.domain.models import BodyMeasurement, Workout, WorkoutSet, WorkoutStatus
+from gym_assistant.domain.models import (
+    BodyMeasurement,
+    Goal,
+    Sex,
+    User,
+    Workout,
+    WorkoutSet,
+    WorkoutStatus,
+)
 from gym_assistant.domain.services import ExerciseService, MeasurementService, ProfileService
 
 DEMO_NOTE = "demo-history"
+
+# A filled-in profile so the card, the BMI line and the reports all have
+# something to show straight away. Change any of it later through /profile.
+DEMO_PROFILE = {
+    "sex": Sex.MALE,
+    "birth_date": date(1990, 12, 31),
+    "height_cm": 183,
+    "goal": Goal.STRENGTH,
+}
 
 # A plain upper/lower split: enough variety for the volume chart to have
 # something to say, without pretending to be a real programme.
@@ -38,13 +58,33 @@ PLAN = (
 )
 
 
+async def _reset(telegram_id: int) -> None:
+    """Deletes the user and everything that hangs off them.
+
+    Every user-owned table cascades from users, so one delete is the whole
+    reset: profile, measurements, photos, workouts, sets, personal exercises
+    and preferences. The shared catalogue is untouched.
+    """
+    engine = create_engine(get_settings().database_url)
+    factory = create_session_factory(engine)
+
+    async with factory() as session:
+        await session.execute(delete(User).where(User.telegram_id == telegram_id))
+        await session.commit()
+        print(f"Стёр всё для пользователя {telegram_id}.")
+
+    await engine.dispose()
+
+
 async def _seed(telegram_id: int, weeks: int) -> None:
     engine = create_engine(get_settings().database_url)
     factory = create_session_factory(engine)
     random.seed(20260902)
 
     async with factory() as session:
-        user = await ProfileService(session).get_or_create_user(telegram_id)
+        profile_service = ProfileService(session)
+        user = await profile_service.get_or_create_user(telegram_id, first_name="Тестер")
+        await profile_service.update_profile(user.id, **DEMO_PROFILE)
         exercises = ExerciseService(session)
 
         resolved = []
@@ -154,10 +194,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--telegram-id", type=int, default=402666721)
     parser.add_argument("--weeks", type=int, default=12)
-    parser.add_argument("--wipe", action="store_true", help="удалить демо-историю")
+    parser.add_argument("--wipe", action="store_true", help="удалить только демо-историю")
+    parser.add_argument(
+        "--reset", action="store_true", help="стереть пользователя целиком и налить заново"
+    )
     args = parser.parse_args()
 
-    asyncio.run(_wipe(args.telegram_id) if args.wipe else _seed(args.telegram_id, args.weeks))
+    async def run() -> None:
+        if args.wipe:
+            await _wipe(args.telegram_id)
+            return
+        if args.reset:
+            await _reset(args.telegram_id)
+        await _seed(args.telegram_id, args.weeks)
+
+    asyncio.run(run())
 
 
 if __name__ == "__main__":
