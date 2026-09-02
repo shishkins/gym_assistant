@@ -24,6 +24,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     SmallInteger,
     String,
@@ -80,6 +81,12 @@ class ExperienceLevel(StrEnum):
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
+
+
+class WorkoutStatus(StrEnum):
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
 
 class Equipment(StrEnum):
@@ -359,3 +366,107 @@ class UserExercisePref(Base, TimestampMixin):
     is_favourite: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
+
+
+class Workout(Base, TimestampMixin):
+    """One training session."""
+
+    __tablename__ = "workouts"
+    __table_args__ = (
+        Index("ix_workouts_user_started", "user_id", "started_at"),
+        # One session at a time. Enforced by the database rather than by a
+        # check in the handler: two quick taps are genuinely concurrent.
+        Index(
+            "uq_workouts_one_in_progress",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status = 'in_progress'"),
+        ),
+        CheckConstraint(_enum_check("status", WorkoutStatus), name="ck_workouts_status"),
+        CheckConstraint(
+            "perceived_effort IS NULL OR (perceived_effort BETWEEN 1 AND 10)",
+            name="ck_workouts_perceived_effort",
+        ),
+        CheckConstraint(
+            "finished_at IS NULL OR finished_at >= started_at",
+            name="ck_workouts_finished_after_started",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=WorkoutStatus.IN_PROGRESS.value
+    )
+    note: Mapped[str | None] = mapped_column(Text)
+    perceived_effort: Mapped[int | None] = mapped_column(SmallInteger)
+
+    sets: Mapped[list[WorkoutSet]] = relationship(
+        back_populates="workout",
+        cascade="all, delete-orphan",
+        order_by="WorkoutSet.performed_at",
+        lazy="selectin",
+    )
+
+    @property
+    def is_open(self) -> bool:
+        return self.status == WorkoutStatus.IN_PROGRESS.value
+
+    def __repr__(self) -> str:
+        return f"<Workout id={self.id} user_id={self.user_id} status={self.status}>"
+
+
+class WorkoutSet(Base, TimestampMixin):
+    """One set. The hottest table in the schema: written 15-30 times a session."""
+
+    __tablename__ = "workout_sets"
+    __table_args__ = (
+        Index("ix_workout_sets_workout", "workout_id", "order_index", "set_index"),
+        # Progress charts and personal records read one exercise across time.
+        Index("ix_workout_sets_exercise_time", "exercise_id", "performed_at"),
+        CheckConstraint("weight_kg IS NULL OR weight_kg BETWEEN 0 AND 1000", name="ck_sets_weight"),
+        CheckConstraint("reps IS NULL OR reps BETWEEN 1 AND 1000", name="ck_sets_reps"),
+        CheckConstraint("rpe IS NULL OR rpe BETWEEN 1 AND 10", name="ck_sets_rpe"),
+        CheckConstraint(
+            "duration_sec IS NULL OR duration_sec BETWEEN 1 AND 86400", name="ck_sets_duration"
+        ),
+        CheckConstraint(
+            "distance_m IS NULL OR distance_m BETWEEN 1 AND 100000", name="ck_sets_distance"
+        ),
+        # A set that records nothing is a bug, not a set.
+        CheckConstraint(
+            "reps IS NOT NULL OR duration_sec IS NOT NULL OR distance_m IS NOT NULL",
+            name="ck_sets_not_empty",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workout_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workouts.id", ondelete="CASCADE"), nullable=False
+    )
+    exercise_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("exercises.id", ondelete="CASCADE"), nullable=False
+    )
+
+    order_index: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    set_index: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("1"))
+
+    weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
+    reps: Mapped[int | None] = mapped_column(SmallInteger)
+    duration_sec: Mapped[int | None] = mapped_column(Integer)
+    distance_m: Mapped[int | None] = mapped_column(Integer)
+    rpe: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
+    is_warmup: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+
+    performed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+
+    workout: Mapped[Workout] = relationship(back_populates="sets", lazy="raise")
+    exercise: Mapped[Exercise] = relationship(lazy="selectin")
+
+    def __repr__(self) -> str:
+        return f"<WorkoutSet id={self.id} exercise_id={self.exercise_id}>"
