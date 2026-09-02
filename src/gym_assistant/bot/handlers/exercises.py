@@ -32,7 +32,11 @@ from gym_assistant.bot.keyboards import (
 from gym_assistant.bot.states import ExerciseCreate, ExerciseSearch
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.domain.models import Exercise, User
-from gym_assistant.domain.services import DuplicateExerciseError, ExerciseService
+from gym_assistant.domain.services import (
+    DuplicateExerciseError,
+    ExerciseService,
+    WorkoutService,
+)
 
 log = structlog.get_logger(__name__)
 router = Router(name="exercises")
@@ -58,6 +62,15 @@ async def _edit(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup
         await message.answer(text, reply_markup=markup)
 
 
+async def _in_workout(session: AsyncSession, user: User) -> bool:
+    """Whether a session is running.
+
+    While one is, the catalogue is a browser inside the workout, not a mode
+    of its own: free text stays a set, and every screen offers a way back.
+    """
+    return await WorkoutService(session).open_workout(user.id) is not None
+
+
 async def _menu_text(service: ExerciseService, user: User) -> str:
     stats = await service.stats(user.id)
     return ru.EXERCISES_MENU.format(total=stats.total, own=stats.own, favourites=stats.favourites)
@@ -76,7 +89,10 @@ async def show_menu(
     Search being armed is the point: the catalogue is something you dip into
     repeatedly during a session, and retyping the command each time is friction.
     """
-    await state.set_state(ExerciseSearch.query)
+    if not workout_open:
+        # Arming catalogue search during a session would take free text away
+        # from the workout, which is what made browsing feel like leaving it.
+        await state.set_state(ExerciseSearch.query)
     await message.answer(
         await _menu_text(service, user),
         reply_markup=menu_keyboard(workout_open=workout_open),
@@ -116,6 +132,7 @@ async def _list_view(
     ref: int = 0,
     page: int = 0,
     query: str = "",
+    workout_open: bool = False,
 ) -> tuple[str, InlineKeyboardMarkup]:
     """Renders any exercise list.
 
@@ -128,13 +145,16 @@ async def _list_view(
     page = min(max(page, 0), total_pages - 1)
 
     if total == 0:
+        keyboard = menu_keyboard(workout_open=workout_open)
         if kind == "favourites":
-            return ru.EXERCISES_FAVOURITES_EMPTY, menu_keyboard()
+            return ru.EXERCISES_FAVOURITES_EMPTY, keyboard
         if kind == "own":
-            return ru.EXERCISES_OWN_EMPTY, menu_keyboard()
+            return ru.EXERCISES_OWN_EMPTY, keyboard
         if kind == "search":
-            return ru.EXERCISES_SEARCH_EMPTY.format(query=query), menu_keyboard()
-        return ru.EXERCISES_GROUP_EMPTY, groups_keyboard(await service.muscle_groups())
+            return ru.EXERCISES_SEARCH_EMPTY.format(query=query), keyboard
+        return ru.EXERCISES_GROUP_EMPTY, groups_keyboard(
+            await service.muscle_groups(), workout_open=workout_open
+        )
 
     items = await _fetch(service, user, kind=kind, ref=ref, query=query, offset=page * PAGE_SIZE)
 
@@ -164,11 +184,17 @@ async def _list_view(
         total_pages=total_pages,
         back_action=back_action,
         back_label=back_label,
+        workout_open=workout_open,
     )
 
 
 async def _show_card(
-    callback: CallbackQuery, service: ExerciseService, user: User, exercise_id: int
+    callback: CallbackQuery,
+    service: ExerciseService,
+    user: User,
+    exercise_id: int,
+    *,
+    workout_open: bool = False,
 ) -> None:
     exercise = await service.get(exercise_id, user_id=user.id)
     if exercise is None:
@@ -178,7 +204,7 @@ async def _show_card(
     await _edit(
         callback,
         render.render_exercise_card(exercise),
-        exercise_card_keyboard(exercise, is_favourite=is_favourite),
+        exercise_card_keyboard(exercise, is_favourite=is_favourite, workout_open=workout_open),
     )
 
 
@@ -195,15 +221,19 @@ async def cmd_exercises(
 ) -> None:
     """``/exercises`` opens the menu, ``/exercises жим`` searches straight away."""
     service = ExerciseService(session)
+    workout_open = await _in_workout(session, user)
 
     if command.args:
-        await state.set_state(ExerciseSearch.query)
+        if not workout_open:
+            await state.set_state(ExerciseSearch.query)
         await state.update_data(search_query=command.args)
-        text, markup = await _list_view(service, user, kind="search", query=command.args)
+        text, markup = await _list_view(
+            service, user, kind="search", query=command.args, workout_open=workout_open
+        )
         await message.answer(text, reply_markup=markup)
         return
 
-    await show_menu(message, state, service, user)
+    await show_menu(message, state, service, user, workout_open=workout_open)
 
 
 # --- Menu navigation ------------------------------------------------------
@@ -218,6 +248,7 @@ async def menu_action(
     user: User,
 ) -> None:
     service = ExerciseService(session)
+    workout_open = await _in_workout(session, user)
     await callback.answer()
 
     match callback_data.action:
@@ -226,20 +257,29 @@ async def menu_action(
             return
 
         case "menu":
-            await state.set_state(ExerciseSearch.query)
-            await _edit(callback, await _menu_text(service, user), menu_keyboard())
+            if not workout_open:
+                await state.set_state(ExerciseSearch.query)
+            await _edit(
+                callback,
+                await _menu_text(service, user),
+                menu_keyboard(workout_open=workout_open),
+            )
 
         case "groups":
             await _edit(
-                callback, ru.EXERCISES_GROUPS, groups_keyboard(await service.muscle_groups())
+                callback,
+                ru.EXERCISES_GROUPS,
+                groups_keyboard(await service.muscle_groups(), workout_open=workout_open),
             )
 
         case "favourites":
-            text, markup = await _list_view(service, user, kind="favourites")
+            text, markup = await _list_view(
+                service, user, kind="favourites", workout_open=workout_open
+            )
             await _edit(callback, text, markup)
 
         case "own":
-            text, markup = await _list_view(service, user, kind="own")
+            text, markup = await _list_view(service, user, kind="own", workout_open=workout_open)
             await _edit(callback, text, markup)
 
         case "search":
@@ -278,6 +318,7 @@ async def list_page(
         ref=callback_data.ref,
         page=callback_data.page,
         query=data.get("search_query", ""),
+        workout_open=await _in_workout(session, user),
     )
     await _edit(callback, text, markup)
 
@@ -287,7 +328,13 @@ async def open_card(
     callback: CallbackQuery, callback_data: ExCardCB, session: AsyncSession, user: User
 ) -> None:
     await callback.answer()
-    await _show_card(callback, ExerciseService(session), user, callback_data.exercise_id)
+    await _show_card(
+        callback,
+        ExerciseService(session),
+        user,
+        callback_data.exercise_id,
+        workout_open=await _in_workout(session, user),
+    )
 
 
 # --- Per-user preferences -------------------------------------------------
@@ -300,7 +347,13 @@ async def toggle_favourite(
     service = ExerciseService(session)
     added = await service.toggle_favourite(user.id, callback_data.exercise_id)
     await callback.answer(ru.EXERCISE_FAV_ADDED if added else ru.EXERCISE_FAV_REMOVED)
-    await _show_card(callback, service, user, callback_data.exercise_id)
+    await _show_card(
+        callback,
+        service,
+        user,
+        callback_data.exercise_id,
+        workout_open=await _in_workout(session, user),
+    )
 
 
 @router.callback_query(ExHideCB.filter())
@@ -346,7 +399,11 @@ async def search_entered(
     # State is deliberately kept: the next message searches again.
     await state.update_data(search_query=message.text)
     text, markup = await _list_view(
-        ExerciseService(session), user, kind="search", query=message.text
+        ExerciseService(session),
+        user,
+        kind="search",
+        query=message.text,
+        workout_open=await _in_workout(session, user),
     )
     await message.answer(text, reply_markup=markup)
 

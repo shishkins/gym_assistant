@@ -348,3 +348,80 @@ async def test_cardio_is_in_the_catalogue(bot: BotHarness) -> None:
     await bot.send("/exercises бег")
 
     assert bot.session.button_with("Бег на дорожке")
+
+
+# --- The catalogue as a browser inside the session -----------------------
+
+
+async def test_typing_still_logs_a_set_while_in_the_catalogue(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    """The bug this flow had: opening the catalogue stole free text.
+
+    You went in to look something up, typed the exercise, and landed in a
+    catalogue search instead of the workout.
+    """
+    await bot.send("/workout")
+    await bot.tap_button("Справочник")
+
+    await bot.send("жим 80х8")
+
+    stored = await _sets(session)
+    assert len(stored) == 1
+    assert stored[0].reps == 8
+
+
+async def test_catalogue_offers_a_way_back_from_every_screen(bot: BotHarness) -> None:
+    """Three levels deep with no way back is what made it feel like leaving."""
+    await bot.send("/workout")
+    await bot.tap_button("Справочник")
+    assert bot.session.button_with("К тренировке")
+
+    await bot.tap_button("По группам")
+    assert bot.session.button_with("К тренировке")
+
+    await bot.tap_button("Грудь")
+    assert bot.session.button_with("К тренировке")
+
+    await bot.tap_button("Жим штанги лёжа")
+    assert bot.session.button_with("К тренировке")
+
+
+async def test_logging_straight_from_a_catalogue_card(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    """Finding the exercise was the point, so logging it is the first action."""
+    await bot.send("/workout")
+    await bot.tap_button("Справочник")
+    await bot.tap_button("По группам")
+    await bot.tap_button("Грудь")
+    await bot.tap_button("Жим штанги лёжа")
+
+    await bot.tap_button("Записать подход")
+    assert "Записать" in bot.session.last_text or "Жим штанги лёжа" in bot.session.last_text
+
+    await bot.send("80х8")
+    stored = await _sets(session)
+    assert len(stored) == 1
+
+
+async def test_catalogue_hides_its_search_button_during_a_session(
+    bot: BotHarness,
+) -> None:
+    """Typing already searches; a second search would take text from the set."""
+    await bot.send("/workout")
+    await bot.tap_button("Справочник")
+
+    labels = [b.text for row in (bot.session.last_markup or []).inline_keyboard for b in row]
+    assert not any("Поиск" in label for label in labels)
+
+
+async def test_catalogue_outside_a_workout_is_unchanged(bot: BotHarness) -> None:
+    await bot.send("/exercises")
+
+    assert bot.session.button_with("Поиск")
+    labels = [b.text for row in (bot.session.last_markup or []).inline_keyboard for b in row]
+    assert not any("К тренировке" in label for label in labels)
+
+    await bot.send("бенч")
+    assert "Нашёл по запросу" in bot.session.last_text

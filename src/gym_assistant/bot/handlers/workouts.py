@@ -26,7 +26,7 @@ from gym_assistant.bot.keyboards import (
     set_entry_keyboard,
     start_keyboard,
 )
-from gym_assistant.bot.states import ExerciseSearch, WorkoutFlow
+from gym_assistant.bot.states import WorkoutFlow
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.domain.models import Exercise, User, WorkoutSet
 from gym_assistant.domain.parsing import ParsedSet, ValueParseError, parse_set_entry
@@ -441,5 +441,7 @@ async def show_catalogue(
     message = callback.message
     if not isinstance(message, Message):
         return
-    await state.set_state(ExerciseSearch.query)
+    # The state stays WorkoutFlow.active on purpose: inside a session typed
+    # text is a set, and the catalogue is browsed with buttons. Arming a
+    # catalogue search here is what made browsing feel like leaving.
     await show_catalogue_menu(message, state, ExerciseService(session), user, workout_open=True)

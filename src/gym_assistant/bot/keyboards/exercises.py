@@ -7,7 +7,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from gym_assistant.bot.keyboards.common import with_cancel
-from gym_assistant.bot.keyboards.workouts import WorkoutCB
+from gym_assistant.bot.keyboards.workouts import WorkoutCB, WorkoutExerciseCB
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.domain.models import Equipment, Exercise, ExerciseType, MuscleGroup
 
@@ -47,25 +47,39 @@ class ExNewCB(CallbackData, prefix="exn"):
     value: str
 
 
+def back_to_workout_row(builder: InlineKeyboardBuilder) -> None:
+    """The way out of the catalogue and back into the session.
+
+    On every catalogue screen, not just the first one: getting three levels
+    deep and finding no way back is what made browsing feel like leaving.
+    """
+    builder.row(
+        InlineKeyboardButton(
+            text=ru.BTN_WORKOUT_PANEL, callback_data=WorkoutCB(action="panel").pack()
+        )
+    )
+
+
 def menu_keyboard(*, workout_open: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    if workout_open:
-        # Browsing the catalogue mid-session must not feel like leaving it.
-        builder.row(
-            InlineKeyboardButton(
-                text=ru.BTN_WORKOUT_PANEL, callback_data=WorkoutCB(action="panel").pack()
-            )
-        )
-    builder.button(text=ru.BTN_SEARCH, callback_data=ExMenuCB(action="search"))
+    if not workout_open:
+        # During a session the search button is redundant and harmful: typing
+        # already finds exercises, and arming a catalogue search would take
+        # free text away from the workout.
+        builder.button(text=ru.BTN_SEARCH, callback_data=ExMenuCB(action="search"))
     builder.button(text=ru.BTN_GROUPS, callback_data=ExMenuCB(action="groups"))
     builder.button(text=ru.BTN_FAVOURITES, callback_data=ExMenuCB(action="favourites"))
     builder.button(text=ru.BTN_OWN, callback_data=ExMenuCB(action="own"))
     builder.button(text=ru.BTN_NEW, callback_data=ExMenuCB(action="new"))
     builder.adjust(2, 2, 1)
+    if workout_open:
+        back_to_workout_row(builder)
     return builder.as_markup()
 
 
-def groups_keyboard(groups: list[MuscleGroup]) -> InlineKeyboardMarkup:
+def groups_keyboard(
+    groups: list[MuscleGroup], *, workout_open: bool = False
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for group in groups:
         builder.button(text=group.name_ru, callback_data=ExListCB(kind="group", ref=group.id))
@@ -73,6 +87,8 @@ def groups_keyboard(groups: list[MuscleGroup]) -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(text=ru.BTN_BACK, callback_data=ExMenuCB(action="menu").pack())
     )
+    if workout_open:
+        back_to_workout_row(builder)
     return builder.as_markup()
 
 
@@ -85,6 +101,7 @@ def exercise_list_keyboard(
     total_pages: int = 1,
     back_action: str = "menu",
     back_label: str | None = None,
+    workout_open: bool = False,
 ) -> InlineKeyboardMarkup:
     """Every exercise list goes through here, so all of them page alike.
 
@@ -126,11 +143,24 @@ def exercise_list_keyboard(
             callback_data=ExMenuCB(action=back_action).pack(),
         )
     )
+    if workout_open:
+        back_to_workout_row(builder)
     return builder.as_markup()
 
 
-def exercise_card_keyboard(exercise: Exercise, *, is_favourite: bool) -> InlineKeyboardMarkup:
+def exercise_card_keyboard(
+    exercise: Exercise, *, is_favourite: bool, workout_open: bool = False
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    if workout_open:
+        # Finding the exercise was the point of coming here, so logging it is
+        # the first action, not something to go back and hunt for.
+        builder.row(
+            InlineKeyboardButton(
+                text=ru.BTN_LOG_THIS,
+                callback_data=WorkoutExerciseCB(exercise_id=exercise.id).pack(),
+            )
+        )
     # A URL button: the video opens directly, the bot proxies nothing.
     builder.row(
         InlineKeyboardButton(
@@ -152,6 +182,8 @@ def exercise_card_keyboard(exercise: Exercise, *, is_favourite: bool) -> InlineK
     builder.row(
         InlineKeyboardButton(text=ru.BTN_BACK, callback_data=ExMenuCB(action="menu").pack())
     )
+    if workout_open:
+        back_to_workout_row(builder)
     return builder.as_markup()
 
 
