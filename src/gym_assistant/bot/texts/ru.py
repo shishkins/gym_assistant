@@ -36,7 +36,7 @@ HELP = (
     "/ping — проверка связи\n\n"
     "Можно просто прислать фото — я сохраню его как фото прогресса.\n"
     "Если в подписи будет число, запишу его как вес.\n\n"
-    "<i>В разработке:</i> тренировки, статистика, "
+    "<i>В разработке:</i> статистика, "
     "голосовой ввод и AI-ассистент."
 )
 
@@ -300,8 +300,98 @@ SEARCH_MODE_OFF = "Вышел из поиска."
 
 MAIN_MENU = "<b>Что делаем?</b>"
 
-BTN_MENU_EXERCISES = "🏋️ Упражнения"
+BTN_MENU_WORKOUT = "🏋️ Тренировка"
+BTN_MENU_EXERCISES = "📖 Упражнения"
 BTN_MENU_PROFILE = "👤 Профиль"
 BTN_MENU_WEIGHT = "⚖️ Записать вес"
 BTN_MENU_PHOTOS = "📸 Фото прогресса"
 BTN_MENU_HELP = "❔ Что я умею"
+
+# --- Workouts -------------------------------------------------------------
+
+WORKOUT_STARTED = "🏋️ <b>Тренировка началась</b>\n\nВыберите упражнение или просто напишите подход."
+
+WORKOUT_PANEL = (
+    "🏋️ <b>Тренировка идёт</b> · {duration}\n"
+    "Подходов: <b>{sets}</b> · тоннаж: <b>{tonnage}</b> кг\n\n"
+    "{exercises}"
+)
+WORKOUT_PANEL_EMPTY = "Пока ничего не записано."
+WORKOUT_PANEL_LINE = "• {name} — {sets}"
+
+WORKOUT_ALREADY_OPEN = "Тренировка уже идёт."
+WORKOUT_NONE_OPEN = "Сейчас тренировки нет.\n\nНачать: /workout — или кнопкой ниже."
+
+WORKOUT_PICK_EXERCISE = "Какое упражнение?"
+WORKOUT_FREQUENT = "Ваши частые упражнения:"
+WORKOUT_NO_FREQUENT = (
+    "История пока пустая, поэтому частых упражнений нет.\n\nНайдите нужное поиском."
+)
+
+# --- Exercise panel inside a workout --------------------------------------
+
+WORKOUT_EXERCISE_FIRST_TIME = "<b>{name}</b>\n\n<i>Раньше не делали — записываю с нуля.</i>"
+WORKOUT_EXERCISE_HISTORY = "<b>{name}</b>\n\nВ прошлый раз ({when}):\n{sets}"
+WORKOUT_EXERCISE_BEST = "\nЛучший результат: <b>{best}</b> кг (расчётный максимум)"
+WORKOUT_EXERCISE_TODAY = "\n\n<b>Сегодня:</b>\n{sets}"
+
+WORKOUT_SET_LINE = "  {index}. {value}"
+WORKOUT_SET_LINE_WARMUP = "  {index}. {value} · разминка"
+
+WORKOUT_ENTRY = "\n\nЗаписать: <b>{weight}</b> кг × <b>{reps}</b>"
+WORKOUT_ENTRY_BODYWEIGHT = "\n\nЗаписать: <b>{reps}</b> повторов"
+
+WORKOUT_SET_SAVED = "✅ {value}"
+WORKOUT_SETS_SAVED = "✅ {count} подхода: {value}"
+WORKOUT_RECORD = "🏆 <b>Личный рекорд!</b> Расчётный максимум {best} кг"
+WORKOUT_RECORD_BEATEN = "🏆 <b>Личный рекорд!</b> {previous} → <b>{best}</b> кг"
+
+WORKOUT_SET_UNDONE = "↩️ Убрал: {value}"
+WORKOUT_NOTHING_TO_UNDO = "Отменять нечего — подходов ещё нет."
+
+WORKOUT_NEED_EXERCISE = (
+    "Не понял, к какому упражнению это относится.\n\n"
+    "Напишите с названием — <code>жим 80х8</code> — или выберите упражнение кнопкой."
+)
+WORKOUT_EXERCISE_NOT_FOUND = (
+    "Не нашёл упражнение «{query}».\n\nПопробуйте иначе или выберите из списка."
+)
+WORKOUT_SET_FORMAT_ERROR = (
+    "Не разобрал подход.\n\n"
+    "Примеры: <code>80х8</code>, <code>82,5х8</code>, <code>80х8х3</code>, "
+    "<code>12</code>, <code>60с</code>, <code>жим 80х8</code>"
+)
+WORKOUT_SET_RANGE_ERROR = "Значения вне разумных пределов — проверьте, пожалуйста."
+
+# --- Finishing ------------------------------------------------------------
+
+WORKOUT_FINISHED = (
+    "🏁 <b>Тренировка завершена</b>\n\n"
+    "Длительность: <b>{duration}</b>\n"
+    "Подходов: <b>{sets}</b> (рабочих {working})\n"
+    "Тоннаж: <b>{tonnage}</b> кг\n\n"
+    "{exercises}"
+)
+WORKOUT_FINISHED_EMPTY = "Тренировка закрыта без записей — в историю не пойдёт."
+WORKOUT_FINISHED_RECORDS = "\n\n🏆 <b>Рекорды:</b>\n{records}"
+WORKOUT_RECORD_LINE = "  • {name} — {best} кг"
+
+WORKOUT_LAST_NONE = "Завершённых тренировок пока нет."
+WORKOUT_LAST_HEADER = "🏁 <b>Последняя тренировка</b> · {when}\n\n"
+
+WORKOUT_STALE_CLOSED = (
+    "Закрыл тренировку, которая осталась открытой с {when} — видимо, забыли нажать «Завершить»."
+)
+
+# --- Workout buttons ------------------------------------------------------
+
+BTN_WORKOUT_START = "🏋️ Начать тренировку"
+BTN_WORKOUT_CONTINUE = "🏋️ Продолжить тренировку"
+BTN_WORKOUT_FINISH = "🏁 Завершить"
+BTN_WORKOUT_ADD_SET = "✅ Записать"
+BTN_WORKOUT_REPEAT = "🔁 Повторить подход"
+BTN_WORKOUT_UNDO = "↩️ Отменить последний"
+BTN_WORKOUT_OTHER = "🔀 Другое упражнение"
+BTN_WORKOUT_FIND = "🔎 Найти упражнение"
+BTN_WORKOUT_PANEL = "🏋️ К тренировке"
+BTN_WARMUP = "🔥 Разминочный"

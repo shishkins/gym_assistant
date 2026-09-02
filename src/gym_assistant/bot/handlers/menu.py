@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gym_assistant.bot.handlers.exercises import show_menu
 from gym_assistant.bot.handlers.measurements import prompt_weight, send_photos
 from gym_assistant.bot.handlers.profile import show_card
+from gym_assistant.bot.handlers.workouts import open_workout_panel
 from gym_assistant.bot.keyboards import CancelCB, MainMenuCB, main_menu_keyboard
 from gym_assistant.bot.texts import ru
 from gym_assistant.domain.models import User
@@ -44,6 +45,8 @@ async def menu_action(
         return
 
     match callback_data.action:
+        case "workout":
+            await open_workout_panel(message, state, session, user)
         case "exercises":
             await show_menu(message, state, ExerciseService(session), user)
         case "weight":

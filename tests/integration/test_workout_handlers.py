@@ -1,0 +1,285 @@
+"""The workout flow driven through the real dispatcher.
+
+The iteration is judged on taps per set, so several of these tests count
+the taps explicitly rather than only checking that something was stored.
+"""
+
+from __future__ import annotations
+
+import pytest_asyncio
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from gym_assistant.config import Settings
+from gym_assistant.domain.services import ProfileService, WorkoutService
+from tests.integration.bot_harness import BotHarness, build_harness
+
+
+@pytest_asyncio.fixture
+async def bot(session: AsyncSession) -> BotHarness:
+    settings = Settings(bot_token="42:test-token-not-real")  # type: ignore[call-arg]
+    return build_harness(session, settings)
+
+
+async def _sets(session: AsyncSession) -> list:
+    user = await ProfileService(session).get_or_create_user(777)
+    return await WorkoutService(session).current_sets(user.id)
+
+
+# --- starting -------------------------------------------------------------
+
+
+async def test_workout_starts_and_shows_the_panel(bot: BotHarness) -> None:
+    await bot.send("/workout")
+
+    assert "Тренировка идёт" in bot.session.last_text
+    assert bot.session.button_with("Завершить")
+
+
+async def test_second_workout_command_continues_the_same_session(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    await bot.send("/workout")
+    await bot.send("/workout")
+
+    user = await ProfileService(session).get_or_create_user(777)
+    assert await WorkoutService(session).open_workout(user.id) is not None
+
+
+# --- the fast path --------------------------------------------------------
+
+
+async def test_typing_a_set_is_one_message(bot: BotHarness, session: AsyncSession) -> None:
+    """The whole point: during a session, free text is a set."""
+    await bot.send("/workout")
+
+    await bot.send("жим 80х8")
+
+    stored = await _sets(session)
+    assert len(stored) == 1
+    assert str(stored[0].weight_kg) == "80.00"
+    assert stored[0].reps == 8
+    assert "80 × 8" in " ".join(bot.session.texts)
+
+
+async def test_repeat_costs_one_tap(bot: BotHarness, session: AsyncSession) -> None:
+    """After the first set, the same set again must be a single button."""
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    await bot.tap_button("Повторить подход")
+
+    stored = await _sets(session)
+    assert len(stored) == 2
+    assert stored[1].reps == 8
+
+
+async def test_picking_a_frequent_exercise_prefills_the_last_working_set(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+    await bot.tap_button("Другое упражнение")
+
+    # The exercise just used is now offered on the panel.
+    await bot.tap_button("Жим штанги лёжа")
+
+    assert "80" in bot.session.last_text
+    assert "Записать" in str(bot.session.last_markup) or bot.session.button_with("Повторить")
+
+
+async def test_three_sets_in_one_line(bot: BotHarness, session: AsyncSession) -> None:
+    await bot.send("/workout")
+
+    await bot.send("жим 80х8х3")
+
+    stored = await _sets(session)
+    assert len(stored) == 3
+    assert [item.set_index for item in stored] == [1, 2, 3]
+
+
+async def test_set_without_a_name_uses_the_current_exercise(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    await bot.send("82,5х6")
+
+    stored = await _sets(session)
+    assert len(stored) == 2
+    assert str(stored[1].weight_kg) == "82.50"
+
+
+async def test_set_without_a_name_and_no_current_exercise_asks(bot: BotHarness) -> None:
+    await bot.send("/workout")
+
+    await bot.send("80х8")
+
+    assert "к какому упражнению" in bot.session.last_text
+
+
+# --- adjusting ------------------------------------------------------------
+
+
+async def test_weight_buttons_adjust_the_pending_set(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    await bot.tap_button("+2.5")
+    await bot.tap_button("Повторить подход")
+
+    stored = await _sets(session)
+    assert str(stored[-1].weight_kg) == "82.50"
+
+
+async def test_rep_buttons_adjust_the_pending_set(bot: BotHarness, session: AsyncSession) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    await bot.tap_button("+1 повтор")
+    await bot.tap_button("Повторить подход")
+
+    stored = await _sets(session)
+    assert stored[-1].reps == 9
+
+
+async def test_warmup_button(bot: BotHarness, session: AsyncSession) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    await bot.tap_button("Разминочный")
+
+    stored = await _sets(session)
+    assert stored[-1].is_warmup
+
+
+# --- undo and finish ------------------------------------------------------
+
+
+async def test_undo_removes_the_last_set(bot: BotHarness, session: AsyncSession) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+    await bot.send("85х6")
+
+    await bot.tap_button("Отменить последний")
+
+    stored = await _sets(session)
+    assert len(stored) == 1
+    assert "Убрал" in " ".join(bot.session.texts)
+
+
+async def test_undo_with_nothing_logged(bot: BotHarness) -> None:
+    await bot.send("/workout")
+
+    await bot.tap_button("Отменить последний")
+
+    assert "Отменять нечего" in bot.session.last_text
+
+
+async def test_finish_reports_a_summary(bot: BotHarness) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8х2")
+
+    await bot.tap_button("Завершить")
+
+    text = bot.session.last_text
+    assert "Тренировка завершена" in text
+    assert "Тоннаж" in text
+    assert "1280" in text
+
+
+async def test_finishing_an_empty_session_says_so(bot: BotHarness) -> None:
+    await bot.send("/workout")
+
+    await bot.tap_button("Завершить")
+
+    assert "без записей" in bot.session.last_text
+
+
+async def test_last_shows_the_finished_session(bot: BotHarness) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+    await bot.tap_button("Завершить")
+
+    bot.session.clear()
+    await bot.send("/last")
+
+    assert "Последняя тренировка" in bot.session.last_text
+
+
+async def test_last_without_history(bot: BotHarness) -> None:
+    await bot.send("/last")
+
+    assert "пока нет" in bot.session.last_text
+
+
+# --- records --------------------------------------------------------------
+
+
+async def test_first_set_of_an_exercise_reports_a_record(bot: BotHarness) -> None:
+    await bot.send("/workout")
+
+    await bot.send("жим 80х8")
+
+    assert "Личный рекорд" in " ".join(bot.session.texts)
+
+
+async def test_a_lighter_set_reports_nothing(bot: BotHarness) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    bot.session.clear()
+    await bot.send("60х8")
+
+    assert "рекорд" not in " ".join(bot.session.texts).lower()
+
+
+# --- errors and detours ---------------------------------------------------
+
+
+async def test_unparseable_line_explains_the_formats(bot: BotHarness) -> None:
+    await bot.send("/workout")
+
+    await bot.send("что-то непонятное 80х")
+
+    assert "Не разобрал подход" in bot.session.last_text
+
+
+async def test_unknown_exercise_name(bot: BotHarness) -> None:
+    await bot.send("/workout")
+
+    await bot.send("квакозябра 80х8")
+
+    assert "Не нашёл упражнение" in bot.session.last_text
+
+
+async def test_typing_a_name_switches_exercise(bot: BotHarness, session: AsyncSession) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    await bot.send("присед")
+    await bot.send("100х5")
+
+    stored = await _sets(session)
+    assert len(stored) == 2
+    assert str(stored[-1].weight_kg) == "100.00"
+
+
+async def test_search_inside_a_workout(bot: BotHarness) -> None:
+    await bot.send("/workout")
+    await bot.tap_button("Найти упражнение")
+
+    await bot.send("присед")
+
+    assert bot.session.button_with("Приседания со штангой")
+
+
+async def test_commands_still_work_during_a_workout(bot: BotHarness) -> None:
+    """A session must not swallow the rest of the bot."""
+    await bot.send("/workout")
+
+    await bot.send("/weight 84")
+
+    assert "Записал" in bot.session.last_text

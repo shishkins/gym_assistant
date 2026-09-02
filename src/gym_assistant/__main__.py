@@ -22,6 +22,7 @@ from gym_assistant.bot.middlewares import (
 )
 from gym_assistant.config import get_settings
 from gym_assistant.db import create_engine, create_session_factory
+from gym_assistant.domain.services import WorkoutService
 from gym_assistant.logging_setup import setup_logging
 
 
@@ -49,6 +50,12 @@ async def main() -> None:
     dispatcher.update.outer_middleware(UserMiddleware())
 
     dispatcher.include_routers(*get_routers())
+
+    async with session_factory() as startup_session:
+        closed = await WorkoutService(startup_session).close_stale()
+        await startup_session.commit()
+    if closed:
+        log.info("stale_workouts_closed", count=len(closed))
 
     me = await bot.get_me()
     # Keeps Telegram's native command menu in sync without BotFather.

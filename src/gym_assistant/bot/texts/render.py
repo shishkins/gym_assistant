@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from urllib.parse import quote_plus
 
 from gym_assistant.bot.texts import ru
-from gym_assistant.domain.models import Equipment, Exercise, ExerciseType
-from gym_assistant.domain.services import ProfileSummary
+from gym_assistant.domain.models import Equipment, Exercise, ExerciseType, WorkoutSet
+from gym_assistant.domain.services import ExerciseHistory, ProfileSummary, WorkoutSummary
 
 
 def format_decimal(value: Decimal) -> str:
@@ -148,3 +149,122 @@ def render_exercise_card(exercise: Exercise) -> str:
         card += ru.EXERCISE_OWN_BADGE
 
     return card
+
+
+def format_duration(minutes: int) -> str:
+    if minutes < 60:
+        return f"{minutes} мин"
+    hours, rest = divmod(minutes, 60)
+    return f"{hours} ч {rest} мин" if rest else f"{hours} ч"
+
+
+def format_seconds(seconds: int) -> str:
+    minutes, rest = divmod(seconds, 60)
+    return f"{minutes}:{rest:02d}" if minutes else f"{rest} с"
+
+
+def render_set_value(item: WorkoutSet) -> str:
+    """One set as a person reads it, not as the schema stores it."""
+    if item.weight_kg is not None and item.reps is not None:
+        value = f"{format_decimal(item.weight_kg)} × {item.reps}"
+    elif item.reps is not None:
+        value = f"{item.reps} повт."
+    elif item.duration_sec is not None:
+        value = format_seconds(item.duration_sec)
+    elif item.distance_m is not None:
+        value = f"{item.distance_m} м"
+    else:  # pragma: no cover - the database forbids this row
+        value = "—"
+
+    if item.rpe is not None:
+        value += f" @{format_decimal(item.rpe)}"
+    return value
+
+
+def render_set_lines(sets: Sequence[WorkoutSet]) -> str:
+    lines = []
+    for index, item in enumerate(sets, start=1):
+        template = ru.WORKOUT_SET_LINE_WARMUP if item.is_warmup else ru.WORKOUT_SET_LINE
+        lines.append(template.format(index=index, value=render_set_value(item)))
+    return "\n".join(lines)
+
+
+def render_workout_panel(
+    *,
+    duration_min: int,
+    sets: Sequence[WorkoutSet],
+    tonnage: Decimal,
+    by_exercise: Sequence[tuple[Exercise, list[WorkoutSet]]],
+) -> str:
+    if not sets:
+        body = ru.WORKOUT_PANEL_EMPTY
+    else:
+        body = "\n".join(
+            ru.WORKOUT_PANEL_LINE.format(
+                name=exercise.name_ru,
+                sets=", ".join(render_set_value(item) for item in items),
+            )
+            for exercise, items in by_exercise
+        )
+    return ru.WORKOUT_PANEL.format(
+        duration=format_duration(duration_min),
+        sets=len(sets),
+        tonnage=format_decimal(tonnage),
+        exercises=body,
+    )
+
+
+def render_exercise_panel(
+    history: ExerciseHistory,
+    today: Sequence[WorkoutSet],
+    *,
+    weight: Decimal | None,
+    reps: int,
+) -> str:
+    if history.is_first_time:
+        text = ru.WORKOUT_EXERCISE_FIRST_TIME.format(name=history.exercise.name_ru)
+    else:
+        text = ru.WORKOUT_EXERCISE_HISTORY.format(
+            name=history.exercise.name_ru,
+            when=format_when(history.last_performed_at) if history.last_performed_at else "",
+            sets=render_set_lines(history.last_sets),
+        )
+        if history.best_estimate is not None:
+            text += ru.WORKOUT_EXERCISE_BEST.format(best=format_decimal(history.best_estimate))
+
+    if today:
+        text += ru.WORKOUT_EXERCISE_TODAY.format(sets=render_set_lines(today))
+
+    if weight is not None:
+        text += ru.WORKOUT_ENTRY.format(weight=format_decimal(weight), reps=reps)
+    else:
+        text += ru.WORKOUT_ENTRY_BODYWEIGHT.format(reps=reps)
+    return text
+
+
+def render_workout_summary(summary: WorkoutSummary) -> str:
+    if summary.is_empty:
+        return ru.WORKOUT_FINISHED_EMPTY
+
+    body = "\n".join(
+        ru.WORKOUT_PANEL_LINE.format(
+            name=exercise.name_ru,
+            sets=", ".join(render_set_value(item) for item in items),
+        )
+        for exercise, items in summary.by_exercise
+    )
+    text = ru.WORKOUT_FINISHED.format(
+        duration=format_duration(summary.duration_min),
+        sets=summary.total_sets,
+        working=summary.working_sets,
+        tonnage=format_decimal(summary.tonnage),
+        exercises=body,
+    )
+    if summary.records:
+        text += ru.WORKOUT_FINISHED_RECORDS.format(
+            records="\n".join(
+                ru.WORKOUT_RECORD_LINE.format(name=exercise.name_ru, best=format_decimal(best))
+                for exercise, best in summary.records
+            )
+        )
+    return text

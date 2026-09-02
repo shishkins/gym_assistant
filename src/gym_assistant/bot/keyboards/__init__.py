@@ -32,6 +32,16 @@ from gym_assistant.bot.keyboards.profile import (
     sex_keyboard,
     skip_keyboard,
 )
+from gym_assistant.bot.keyboards.workouts import (
+    SetAdjustCB,
+    SetCommitCB,
+    WorkoutCB,
+    WorkoutExerciseCB,
+    back_to_panel_keyboard,
+    panel_keyboard,
+    set_entry_keyboard,
+    start_keyboard,
+)
 
 __all__ = [
     "CHOICE_ENUMS",
@@ -48,7 +58,12 @@ __all__ = [
     "ExNewCB",
     "ExUnhideCB",
     "MainMenuCB",
+    "SetAdjustCB",
+    "SetCommitCB",
     "SkipCB",
+    "WorkoutCB",
+    "WorkoutExerciseCB",
+    "back_to_panel_keyboard",
     "cancel_button",
     "cancel_keyboard",
     "exercise_card_keyboard",
@@ -61,9 +76,12 @@ __all__ = [
     "new_equipment_keyboard",
     "new_group_keyboard",
     "new_type_keyboard",
+    "panel_keyboard",
     "profile_keyboard",
+    "set_entry_keyboard",
     "sex_keyboard",
     "skip_keyboard",
+    "start_keyboard",
     "undo_hide_keyboard",
     "with_cancel",
 ]
