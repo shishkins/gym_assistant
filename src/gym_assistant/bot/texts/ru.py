@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gym_assistant.domain.models import ExperienceLevel, Goal, Sex
+from gym_assistant.domain.models import Equipment, ExerciseType, ExperienceLevel, Goal, Sex
 
 # --- Access control -------------------------------------------------------
 
@@ -36,7 +36,7 @@ HELP = (
     "/ping — проверка связи\n\n"
     "Можно просто прислать фото — я сохраню его как фото прогресса.\n"
     "Если в подписи будет число, запишу его как вес.\n\n"
-    "<i>В разработке:</i> упражнения, тренировки, статистика, "
+    "<i>В разработке:</i> тренировки, статистика, "
     "голосовой ввод и AI-ассистент."
 )
 
@@ -168,3 +168,108 @@ PHOTOS_EMPTY = (
 PHOTOS_HEADER = "📸 Фото прогресса: последние {shown} из {total}"
 PHOTO_CAPTION = "{date}"
 PHOTO_CAPTION_WITH_WEIGHT = "{date} · {weight} кг"
+
+# --- Exercise catalogue ---------------------------------------------------
+
+EQUIPMENT_LABELS = {
+    Equipment.BARBELL: "штанга",
+    Equipment.DUMBBELL: "гантели",
+    Equipment.MACHINE: "тренажёр",
+    Equipment.CABLE: "блок",
+    Equipment.BODYWEIGHT: "свой вес",
+    Equipment.KETTLEBELL: "гиря",
+    Equipment.OTHER: "другое",
+}
+
+EXERCISE_TYPE_LABELS = {
+    ExerciseType.WEIGHT_REPS: "вес × повторы",
+    ExerciseType.BODYWEIGHT_REPS: "повторы",
+    ExerciseType.TIME: "время",
+    ExerciseType.DISTANCE: "дистанция",
+}
+
+EXERCISES_MENU = (
+    "🏋️ <b>Справочник упражнений</b>\n\n"
+    "Доступно упражнений: <b>{total}</b>\n"
+    "Из них ваших: {own} · в избранном: {favourites}\n\n"
+    "Найдите упражнение поиском или выберите группу мышц."
+)
+
+EXERCISES_SEARCH_PROMPT = (
+    "Что ищем?\n\n"
+    "Можно писать сокращённо и с опечатками: <code>бенч</code>, "
+    "<code>приседанья</code>, <code>тяга</code>."
+)
+
+EXERCISES_SEARCH_EMPTY = (
+    "Ничего не нашёл по запросу «{query}».\n\n"
+    "Попробуйте короче или выберите группу мышц. "
+    "Если такого упражнения у меня нет — добавьте своё."
+)
+
+EXERCISES_SEARCH_RESULTS = "Нашёл по запросу «{query}»:"
+EXERCISES_GROUPS = "Выберите группу мышц:"
+EXERCISES_GROUP_EMPTY = "В этой группе пока нет упражнений."
+EXERCISES_GROUP_RESULTS = "<b>{group}</b>\n\nСначала базовые, потом изолирующие."
+
+EXERCISES_FAVOURITES_EMPTY = (
+    "В избранном пусто.\n\nОткройте любое упражнение и нажмите «В избранное» — они соберутся здесь."
+)
+EXERCISES_FAVOURITES = "⭐ <b>Избранное</b>"
+
+EXERCISES_OWN_EMPTY = (
+    "Своих упражнений пока нет.\n\n"
+    "Добавьте то, чего нет в справочнике — оно будет видно только вам."
+)
+EXERCISES_OWN = "🛠 <b>Мои упражнения</b>"
+
+# --- Exercise card --------------------------------------------------------
+
+EXERCISE_CARD = "<b>{name}</b>\n{meta}"
+EXERCISE_META = "{muscles} · {equipment} · {type}"
+EXERCISE_COMPOUND = "базовое"
+EXERCISE_ISOLATION = "изолирующее"
+EXERCISE_OWN_BADGE = "\n\n<i>Ваше упражнение</i>"
+
+EXERCISE_TIPS = "\n\n<b>Как делать</b>\n{tips}"
+EXERCISE_MISTAKES = "\n\n<b>Частые ошибки</b>\n{mistakes}"
+
+BTN_VIDEO = "▶️ Техника на видео"
+BTN_VIDEO_SEARCH = "🔎 Найти видео"
+BTN_FAV_ADD = "☆ В избранное"
+BTN_FAV_REMOVE = "★ Убрать из избранного"
+BTN_HIDE = "🚫 Скрыть из справочника"
+BTN_BACK = "‹ Назад"
+
+EXERCISE_FAV_ADDED = "Добавлено в избранное"
+EXERCISE_FAV_REMOVED = "Убрано из избранного"
+EXERCISE_HIDDEN = "Скрыл «{name}» — в поиске и списках его больше не будет."
+EXERCISE_RESTORED = "Вернул «{name}» в справочник."
+BTN_UNHIDE = "↩️ Вернуть"
+
+# --- Creating an exercise -------------------------------------------------
+
+EXERCISE_NEW_NAME = (
+    "Как называется упражнение?\n\n"
+    "Например: <code>Тяга Т-грифа</code>\n\n"
+    "<i>Оно будет видно только вам.</i>"
+)
+EXERCISE_NEW_GROUP = "Какая группа мышц основная?"
+EXERCISE_NEW_EQUIPMENT = "На чём выполняется?"
+EXERCISE_NEW_TYPE = (
+    "Что записываем в подходе?\n\n"
+    "<i>От этого зависит, какие поля бот будет спрашивать во время тренировки.</i>"
+)
+EXERCISE_NEW_DONE = "✅ Добавил «{name}» в ваш справочник."
+EXERCISE_NEW_DUPLICATE = (
+    "Упражнение с таким названием у вас уже есть.\n\n"
+    "Придумайте другое название или откройте существующее."
+)
+EXERCISE_NAME_TOO_SHORT = "Слишком коротко — нужно хотя бы три символа."
+EXERCISE_NAME_TOO_LONG = "Слишком длинно. Уложитесь в 80 символов."
+
+BTN_SEARCH = "🔎 Поиск"
+BTN_GROUPS = "📂 По группам мышц"
+BTN_FAVOURITES = "⭐ Избранное"
+BTN_OWN = "🛠 Мои упражнения"
+BTN_NEW = "➕ Добавить своё"

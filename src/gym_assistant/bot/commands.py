@@ -9,6 +9,7 @@ from __future__ import annotations
 from aiogram.types import BotCommand
 
 BOT_COMMANDS: tuple[BotCommand, ...] = (
+    BotCommand(command="exercises", description="Справочник упражнений"),
     BotCommand(command="profile", description="Профиль"),
     BotCommand(command="weight", description="Записать вес"),
     BotCommand(command="photos", description="Фото прогресса"),

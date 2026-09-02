@@ -9,7 +9,14 @@ Order is behaviour, not style:
 
 from aiogram import Router
 
-from gym_assistant.bot.handlers import common, fallback, measurements, onboarding, profile
+from gym_assistant.bot.handlers import (
+    common,
+    exercises,
+    fallback,
+    measurements,
+    onboarding,
+    profile,
+)
 
 
 def get_routers() -> tuple[Router, ...]:
@@ -18,6 +25,7 @@ def get_routers() -> tuple[Router, ...]:
         onboarding.router,
         profile.router,
         measurements.router,
+        exercises.router,
         fallback.router,
     )
 

@@ -31,6 +31,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -79,6 +80,25 @@ class ExperienceLevel(StrEnum):
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
+
+
+class Equipment(StrEnum):
+    BARBELL = "barbell"
+    DUMBBELL = "dumbbell"
+    MACHINE = "machine"
+    CABLE = "cable"
+    BODYWEIGHT = "bodyweight"
+    KETTLEBELL = "kettlebell"
+    OTHER = "other"
+
+
+class ExerciseType(StrEnum):
+    """Decides which fields a set of this exercise asks for."""
+
+    WEIGHT_REPS = "weight_reps"  # bench press: weight x reps
+    BODYWEIGHT_REPS = "bodyweight_reps"  # pull-ups: reps, optional added weight
+    TIME = "time"  # plank: seconds
+    DISTANCE = "distance"  # farmer's walk: metres
 
 
 def _enum_check(column: str, enum: type[StrEnum]) -> str:
@@ -207,3 +227,135 @@ class BodyMeasurement(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<BodyMeasurement id={self.id} user_id={self.user_id} at={self.measured_at}>"
+
+
+class MuscleGroup(Base):
+    """Reference list. Seeded once and rarely touched."""
+
+    __tablename__ = "muscle_groups"
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    name_ru: Mapped[str] = mapped_column(Text, nullable=False)
+    sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+
+    def __repr__(self) -> str:
+        return f"<MuscleGroup {self.code}>"
+
+
+class Exercise(Base, TimestampMixin):
+    """A movement, either shipped with the bot or added by one user.
+
+    ``owner_user_id IS NULL`` marks a system exercise, visible to everyone.
+    A non-null owner makes it private to that user.
+    """
+
+    __tablename__ = "exercises"
+    __table_args__ = (
+        # COALESCE, because a plain UNIQUE(owner_user_id, slug) would let the
+        # same system slug be inserted twice: NULLs never collide in SQL.
+        Index(
+            "uq_exercises_owner_slug",
+            text("COALESCE(owner_user_id, 0)"),
+            "slug",
+            unique=True,
+        ),
+        Index("ix_exercises_owner", "owner_user_id"),
+        # Alias lookup is an array-containment test.
+        Index("ix_exercises_aliases", "aliases", postgresql_using="gin"),
+        # Trigram index: powers typo-tolerant search on the display name.
+        Index(
+            "ix_exercises_name_trgm",
+            "name_ru",
+            postgresql_using="gin",
+            postgresql_ops={"name_ru": "gin_trgm_ops"},
+        ),
+        CheckConstraint(_enum_check("equipment", Equipment), name="ck_exercises_equipment"),
+        CheckConstraint(
+            _enum_check("exercise_type", ExerciseType),
+            name="ck_exercises_exercise_type",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    owner_user_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id", ondelete="CASCADE"),
+    )
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    name_ru: Mapped[str] = mapped_column(Text, nullable=False)
+    # Search terms people actually type: "бенч", "жим", "жим лёжа".
+    aliases: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+
+    primary_muscle_group_id: Mapped[int] = mapped_column(
+        SmallInteger,
+        ForeignKey("muscle_groups.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    equipment: Mapped[str] = mapped_column(String(16), nullable=False)
+    exercise_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_compound: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+
+    video_url: Mapped[str | None] = mapped_column(Text)
+    technique_tips: Mapped[str | None] = mapped_column(Text)
+    common_mistakes: Mapped[str | None] = mapped_column(Text)
+
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+
+    primary_muscle_group: Mapped[MuscleGroup] = relationship(lazy="selectin")
+    secondary_muscle_groups: Mapped[list[MuscleGroup]] = relationship(
+        secondary="exercise_secondary_muscles",
+        lazy="selectin",
+        order_by="MuscleGroup.sort_order",
+    )
+
+    @property
+    def is_system(self) -> bool:
+        return self.owner_user_id is None
+
+    def __repr__(self) -> str:
+        return f"<Exercise {self.slug} owner={self.owner_user_id}>"
+
+
+class ExerciseSecondaryMuscle(Base):
+    """Muscles a movement also loads, used for weekly volume in iteration 4."""
+
+    __tablename__ = "exercise_secondary_muscles"
+
+    exercise_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("exercises.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    muscle_group_id: Mapped[int] = mapped_column(
+        SmallInteger,
+        ForeignKey("muscle_groups.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+
+class UserExercisePref(Base, TimestampMixin):
+    """Per-user view of the shared catalogue.
+
+    Hiding writes a row here rather than copying the exercise: a copy would
+    drift from the original and double every future catalogue update.
+    """
+
+    __tablename__ = "user_exercise_prefs"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    exercise_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("exercises.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    is_hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    is_favourite: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )

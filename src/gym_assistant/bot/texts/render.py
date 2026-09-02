@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from urllib.parse import quote_plus
 
 from gym_assistant.bot.texts import ru
+from gym_assistant.domain.models import Equipment, Exercise, ExerciseType
 from gym_assistant.domain.services import ProfileSummary
 
 
@@ -109,3 +111,40 @@ def _experience(summary: ProfileSummary) -> str:
     if summary.experience_level is None:
         return ru.PROFILE_NOT_SET
     return ru.EXPERIENCE_LABELS[summary.experience_level]
+
+
+def exercise_video_url(exercise: Exercise) -> str:
+    """A curated link when we have one, otherwise a YouTube search.
+
+    The seeded catalogue ships without video URLs on purpose: an invented
+    video id is worse than no link at all. A search always resolves to
+    something relevant, and a real URL replaces it the moment one is added.
+    """
+    if exercise.video_url:
+        return exercise.video_url
+    query = quote_plus(f"{exercise.name_ru} техника выполнения")
+    return f"https://www.youtube.com/results?search_query={query}"
+
+
+def render_exercise_card(exercise: Exercise) -> str:
+    muscles = exercise.primary_muscle_group.name_ru
+    secondary = [group.name_ru for group in exercise.secondary_muscle_groups]
+    if secondary:
+        muscles += " + " + ", ".join(secondary)
+
+    meta = ru.EXERCISE_META.format(
+        muscles=muscles,
+        equipment=ru.EQUIPMENT_LABELS[Equipment(exercise.equipment)],
+        type=ru.EXERCISE_TYPE_LABELS[ExerciseType(exercise.exercise_type)],
+    )
+    kind = ru.EXERCISE_COMPOUND if exercise.is_compound else ru.EXERCISE_ISOLATION
+    card = ru.EXERCISE_CARD.format(name=exercise.name_ru, meta=f"{meta} · {kind}")
+
+    if exercise.technique_tips:
+        card += ru.EXERCISE_TIPS.format(tips=exercise.technique_tips.strip())
+    if exercise.common_mistakes:
+        card += ru.EXERCISE_MISTAKES.format(mistakes=exercise.common_mistakes.strip())
+    if not exercise.is_system:
+        card += ru.EXERCISE_OWN_BADGE
+
+    return card
