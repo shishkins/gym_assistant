@@ -2,6 +2,7 @@
 
 Order is behaviour, not style:
 * ``common`` first, so /cancel escapes any wizard;
+* ``menu`` next, so /menu is reachable from inside one too;
 * ``onboarding`` before ``profile``, because both answer the same callback
   payloads and onboarding claims them only while its states are set;
 * ``fallback`` last, since it matches everything.
@@ -14,6 +15,7 @@ from gym_assistant.bot.handlers import (
     exercises,
     fallback,
     measurements,
+    menu,
     onboarding,
     profile,
 )
@@ -22,6 +24,7 @@ from gym_assistant.bot.handlers import (
 def get_routers() -> tuple[Router, ...]:
     return (
         common.router,
+        menu.router,
         onboarding.router,
         profile.router,
         measurements.router,

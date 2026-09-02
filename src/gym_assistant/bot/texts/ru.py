@@ -273,3 +273,32 @@ BTN_GROUPS = "📂 По группам мышц"
 BTN_FAVOURITES = "⭐ Избранное"
 BTN_OWN = "🛠 Мои упражнения"
 BTN_NEW = "➕ Добавить своё"
+
+# --- Pagination and search mode -------------------------------------------
+
+BTN_PREV_PAGE = "‹"
+BTN_NEXT_PAGE = "›"
+PAGE_INDICATOR = "{page}/{total}"
+
+BTN_EXIT_SEARCH = "✖️ Выйти из поиска"
+BTN_TO_CATALOGUE = "📖 В справочник"
+
+SEARCH_MODE_ON = (
+    "🔎 <b>Режим поиска</b>\n\n"
+    "Пишите названия — я буду искать по каждому сообщению.\n"
+    "Сокращения и опечатки понимаю: <code>бенч</code>, <code>приседанья</code>.\n\n"
+    "Выйти: кнопка ниже или /cancel"
+)
+
+SEARCH_MODE_AGAIN = "Ищите дальше или выйдите из режима."
+SEARCH_MODE_OFF = "Вышел из поиска."
+
+# --- Main menu ------------------------------------------------------------
+
+MAIN_MENU = "<b>Что делаем?</b>"
+
+BTN_MENU_EXERCISES = "🏋️ Упражнения"
+BTN_MENU_PROFILE = "👤 Профиль"
+BTN_MENU_WEIGHT = "⚖️ Записать вес"
+BTN_MENU_PHOTOS = "📸 Фото прогресса"
+BTN_MENU_HELP = "❔ Что я умею"

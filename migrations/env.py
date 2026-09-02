@@ -20,7 +20,10 @@ from gym_assistant.domain.models import Base
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers defaults to True, which switches off every
+    # logger already configured - including the application's. Harmless when
+    # alembic runs as its own process, silently fatal when it does not.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # A caller (the integration-test fixture) may point alembic at another
 # database by setting the URL programmatically; otherwise use settings.

@@ -63,6 +63,13 @@ async def cmd_weight(
         await _save_weight(message, session, user, value)
         return
 
+    await prompt_weight(message, state, session, user)
+
+
+async def prompt_weight(
+    message: Message, state: FSMContext, session: AsyncSession, user: User
+) -> None:
+    """Asks for a weight, showing the previous one as an anchor."""
     service = MeasurementService(session)
     last = await service.latest_weigh_in(user.id)
     await state.set_state(WeightEntry.value)
@@ -131,6 +138,10 @@ async def photo_received(message: Message, session: AsyncSession, user: User) ->
 
 @router.message(Command("photos"))
 async def cmd_photos(message: Message, session: AsyncSession, user: User) -> None:
+    await send_photos(message, session, user)
+
+
+async def send_photos(message: Message, session: AsyncSession, user: User) -> None:
     service = MeasurementService(session)
     photos = await service.photos(user.id, limit=PHOTO_PAGE_SIZE)
 

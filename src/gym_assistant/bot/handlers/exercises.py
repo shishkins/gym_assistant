@@ -26,6 +26,7 @@ from gym_assistant.bot.keyboards import (
     new_equipment_keyboard,
     new_group_keyboard,
     new_type_keyboard,
+    search_results_keyboard,
     undo_hide_keyboard,
 )
 from gym_assistant.bot.states import ExerciseCreate, ExerciseSearch
@@ -39,6 +40,9 @@ router = Router(name="exercises")
 NAME_MIN_LENGTH = 3
 NAME_MAX_LENGTH = 80
 SEARCH_LIMIT = 8
+# Telegram renders a taller keyboard fine, but a list you have to scroll
+# past the message box stops being scannable.
+GROUP_PAGE_SIZE = 8
 
 
 async def _edit(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup) -> None:
@@ -91,9 +95,23 @@ async def cmd_exercises(
 
     if command.args:
         await _answer_search(message, service, user, command.args)
+        # An inline query is a one-off lookup, but staying armed means the
+        # next thought can be typed straight in without the command again.
+        await state.set_state(ExerciseSearch.query)
         return
 
-    await state.clear()
+    await show_menu(message, state, service, user)
+
+
+async def show_menu(
+    message: Message, state: FSMContext, service: ExerciseService, user: User
+) -> None:
+    """Opens the catalogue and leaves search armed.
+
+    Search being armed is the point: the catalogue is something you dip into
+    repeatedly during a session, and re-typing /exercises each time is friction.
+    """
+    await state.set_state(ExerciseSearch.query)
     await message.answer(await _menu_text(service, user), reply_markup=menu_keyboard())
 
 
@@ -108,7 +126,7 @@ async def _answer_search(
         return
     await message.answer(
         ru.EXERCISES_SEARCH_RESULTS.format(query=query),
-        reply_markup=exercise_list_keyboard(found),
+        reply_markup=search_results_keyboard(found),
     )
 
 
@@ -127,8 +145,12 @@ async def menu_action(
     await callback.answer()
 
     match callback_data.action:
+        case "noop":
+            # The page counter is a label, not a control.
+            return
+
         case "menu":
-            await state.clear()
+            await state.set_state(ExerciseSearch.query)
             await _edit(callback, await _menu_text(service, user), menu_keyboard())
 
         case "groups":
@@ -154,7 +176,7 @@ async def menu_action(
             await state.set_state(ExerciseSearch.query)
             message = callback.message
             if isinstance(message, Message):
-                await message.answer(ru.EXERCISES_SEARCH_PROMPT)
+                await message.answer(ru.SEARCH_MODE_ON)
 
         case "new":
             await state.set_state(ExerciseCreate.name)
@@ -170,18 +192,31 @@ async def open_group(
     service = ExerciseService(session)
     await callback.answer()
 
-    exercises = await service.by_muscle_group(callback_data.group_id, user_id=user.id)
-    if not exercises:
+    total = await service.count_by_muscle_group(callback_data.group_id, user_id=user.id)
+    if not total:
         await _edit(
             callback, ru.EXERCISES_GROUP_EMPTY, groups_keyboard(await service.muscle_groups())
         )
         return
 
+    total_pages = max(1, -(-total // GROUP_PAGE_SIZE))
+    page = min(max(callback_data.page, 0), total_pages - 1)
+
+    exercises = await service.by_muscle_group(
+        callback_data.group_id,
+        user_id=user.id,
+        limit=GROUP_PAGE_SIZE,
+        offset=page * GROUP_PAGE_SIZE,
+    )
     groups = {group.id: group for group in await service.muscle_groups()}
     await _edit(
         callback,
         ru.EXERCISES_GROUP_RESULTS.format(group=groups[callback_data.group_id].name_ru),
-        exercise_list_keyboard(exercises, back_action="groups"),
+        exercise_list_keyboard(
+            exercises,
+            back_action="groups",
+            pager=(callback_data.group_id, page, total_pages),
+        ),
     )
 
 
@@ -253,7 +288,7 @@ async def search_entered(
     if not message.text:
         await message.answer(ru.EXERCISES_SEARCH_PROMPT)
         return
-    await state.clear()
+    # State is deliberately kept: the next message searches again.
     await _answer_search(message, ExerciseService(session), user, message.text)
 
 

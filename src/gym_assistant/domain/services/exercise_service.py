@@ -32,8 +32,15 @@ class ExerciseService:
     async def muscle_groups(self) -> list[MuscleGroup]:
         return await self._exercises.muscle_groups()
 
-    async def by_muscle_group(self, muscle_group_id: int, *, user_id: int) -> list[Exercise]:
-        return await self._exercises.by_muscle_group(muscle_group_id, user_id=user_id)
+    async def by_muscle_group(
+        self, muscle_group_id: int, *, user_id: int, limit: int = 50, offset: int = 0
+    ) -> list[Exercise]:
+        return await self._exercises.by_muscle_group(
+            muscle_group_id, user_id=user_id, limit=limit, offset=offset
+        )
+
+    async def count_by_muscle_group(self, muscle_group_id: int, *, user_id: int) -> int:
+        return await self._exercises.count_by_muscle_group(muscle_group_id, user_id=user_id)
 
     async def search(self, query: str, *, user_id: int, limit: int = 10) -> list[Exercise]:
         return await self._exercises.search(query, user_id=user_id, limit=limit)
@@ -93,7 +100,18 @@ class ExerciseService:
             video_url=video_url,
             technique_tips=technique_tips,
         )
-        return await self._exercises.add(exercise, secondary_ids=secondary_muscle_group_ids or [])
+        created = await self._exercises.add(
+            exercise, secondary_ids=secondary_muscle_group_ids or []
+        )
+
+        # Re-read through a query so the relationship loaders actually run.
+        # A freshly constructed object has its relationships unloaded, and
+        # under asyncio touching one raises MissingGreenlet rather than
+        # quietly emitting a SELECT - which is exactly what a renderer does.
+        stored = await self._exercises.get(created.id, user_id=user_id)
+        if stored is None:  # pragma: no cover - the row was just written
+            raise RuntimeError(f"exercise {created.id} vanished right after insert")
+        return stored
 
     # -- per-user preferences ---------------------------------------------
 

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant import __version__
 from gym_assistant.bot.handlers import onboarding
+from gym_assistant.bot.states import ExerciseSearch
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.config import Settings
 from gym_assistant.domain.models import User
@@ -40,11 +41,18 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession, 
 @router.message(Command("cancel"), StateFilter("*"))
 async def cmd_cancel(message: Message, state: FSMContext) -> None:
     """Registered first so it works from inside any wizard."""
-    if await state.get_state() is None:
+    current = await state.get_state()
+    if current is None:
         await message.answer(ru.NOTHING_TO_CANCEL)
         return
+
     await state.clear()
-    await message.answer(ru.CANCELLED)
+    # Search mode is a mode, not an unfinished form: saying "отменил" there
+    # would suggest something was thrown away.
+    if current == ExerciseSearch.query.state:
+        await message.answer(ru.SEARCH_MODE_OFF)
+    else:
+        await message.answer(ru.CANCELLED)
 
 
 @router.message(Command("help"))

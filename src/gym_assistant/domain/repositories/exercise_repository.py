@@ -100,7 +100,7 @@ class ExerciseRepository:
         return list(await self._session.scalars(stmt))
 
     async def by_muscle_group(
-        self, muscle_group_id: int, *, user_id: int, limit: int = 50
+        self, muscle_group_id: int, *, user_id: int, limit: int = 50, offset: int = 0
     ) -> list[Exercise]:
         stmt = (
             select(Exercise)
@@ -109,10 +109,23 @@ class ExerciseRepository:
                 Exercise.primary_muscle_group_id == muscle_group_id,
             )
             # Compound movements first: they are what a session is built around.
+            # name_ru is the tiebreaker so paging stays stable between calls.
             .order_by(Exercise.is_compound.desc(), Exercise.name_ru)
+            .offset(offset)
             .limit(limit)
         )
         return list(await self._session.scalars(stmt))
+
+    async def count_by_muscle_group(self, muscle_group_id: int, *, user_id: int) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(Exercise)
+            .where(
+                self._visible_to(user_id),
+                Exercise.primary_muscle_group_id == muscle_group_id,
+            )
+        )
+        return await self._session.scalar(stmt) or 0
 
     async def favourites(self, user_id: int, *, limit: int = 10) -> list[Exercise]:
         stmt = (

@@ -16,6 +16,7 @@ class ExMenuCB(CallbackData, prefix="exm"):
 
 class ExGroupCB(CallbackData, prefix="exg"):
     group_id: int
+    page: int = 0
 
 
 class ExCardCB(CallbackData, prefix="exc"):
@@ -64,15 +65,58 @@ def groups_keyboard(groups: list[MuscleGroup]) -> InlineKeyboardMarkup:
 
 
 def exercise_list_keyboard(
-    exercises: list[Exercise], *, back_action: str = "menu"
+    exercises: list[Exercise],
+    *,
+    back_action: str = "menu",
+    pager: tuple[int, int, int] | None = None,
 ) -> InlineKeyboardMarkup:
+    """``pager`` is ``(group_id, page, total_pages)`` when the list is paged."""
+    builder = InlineKeyboardBuilder()
+    for exercise in exercises:
+        label = exercise.name_ru if exercise.is_system else f"🛠 {exercise.name_ru}"
+        builder.button(text=label, callback_data=ExCardCB(exercise_id=exercise.id))
+    builder.adjust(1)
+
+    if pager is not None:
+        group_id, page, total_pages = pager
+        if total_pages > 1:
+            controls = [
+                InlineKeyboardButton(
+                    text=ru.BTN_PREV_PAGE,
+                    callback_data=ExGroupCB(group_id=group_id, page=page - 1).pack(),
+                )
+                if page > 0
+                # A disabled-looking spacer keeps the row width steady, so the
+                # buttons do not jump sideways as you page through.
+                else InlineKeyboardButton(text=" ", callback_data=ExMenuCB(action="noop").pack()),
+                InlineKeyboardButton(
+                    text=ru.PAGE_INDICATOR.format(page=page + 1, total=total_pages),
+                    callback_data=ExMenuCB(action="noop").pack(),
+                ),
+                InlineKeyboardButton(
+                    text=ru.BTN_NEXT_PAGE,
+                    callback_data=ExGroupCB(group_id=group_id, page=page + 1).pack(),
+                )
+                if page + 1 < total_pages
+                else InlineKeyboardButton(text=" ", callback_data=ExMenuCB(action="noop").pack()),
+            ]
+            builder.row(*controls)
+
+    builder.row(
+        InlineKeyboardButton(text=ru.BTN_BACK, callback_data=ExMenuCB(action=back_action).pack())
+    )
+    return builder.as_markup()
+
+
+def search_results_keyboard(exercises: list[Exercise]) -> InlineKeyboardMarkup:
+    """Search stays active, so the list offers a way out rather than "back"."""
     builder = InlineKeyboardBuilder()
     for exercise in exercises:
         label = exercise.name_ru if exercise.is_system else f"🛠 {exercise.name_ru}"
         builder.button(text=label, callback_data=ExCardCB(exercise_id=exercise.id))
     builder.adjust(1)
     builder.row(
-        InlineKeyboardButton(text=ru.BTN_BACK, callback_data=ExMenuCB(action=back_action).pack())
+        InlineKeyboardButton(text=ru.BTN_EXIT_SEARCH, callback_data=ExMenuCB(action="menu").pack())
     )
     return builder.as_markup()
 
@@ -107,6 +151,8 @@ def undo_hide_keyboard(exercise_id: int) -> InlineKeyboardMarkup:
     """Hiding takes one tap, so undoing it must take one tap too."""
     builder = InlineKeyboardBuilder()
     builder.button(text=ru.BTN_UNHIDE, callback_data=ExUnhideCB(exercise_id=exercise_id))
+    builder.button(text=ru.BTN_TO_CATALOGUE, callback_data=ExMenuCB(action="menu"))
+    builder.adjust(1)
     return builder.as_markup()
 
 
