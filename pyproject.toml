@@ -14,6 +14,7 @@ dependencies = [
     "redis>=5.2",
     "structlog>=24.4",
     "pyyaml>=6.0.3",
+    "matplotlib>=3.11.1",
 ]
 
 [dependency-groups]
@@ -65,10 +66,22 @@ no_implicit_optional = true
 check_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
-# The domain and analytics layers are pure logic: they get the strict treatment.
+# The domain layer and the metrics are pure logic: they get the strict
+# treatment. Chart rendering does not - it is a thin adapter over matplotlib,
+# whose stubs leave date2num and the formatters untyped, and silencing that
+# call by call would bury the real signal strict mode exists to give.
 [[tool.mypy.overrides]]
-module = ["gym_assistant.domain.*", "gym_assistant.analytics.*"]
+module = ["gym_assistant.domain.*", "gym_assistant.analytics.metrics"]
 strict = true
+
+# matplotlib ships partial stubs: date2num and the tick formatters are
+# untyped, so every call from a strict module reads as an error. Silencing
+# them one by one would bury the signal strict mode exists to give, so the
+# two rendering modules opt out of that check specifically - they hold no
+# logic worth type-proving, only drawing calls.
+[[tool.mypy.overrides]]
+module = ["gym_assistant.analytics.charts", "gym_assistant.analytics.style"]
+disallow_untyped_calls = false
 
 # --------------------------------------------------------------------------
 # Tests
