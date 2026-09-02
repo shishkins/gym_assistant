@@ -185,10 +185,12 @@ async def test_first_ever_set_is_a_record(session: AsyncSession) -> None:
 
     assert logged.is_record
     assert logged.previous_best is None
-    assert logged.new_best == Decimal("101.3")
+    # The record is the weight on the bar, not the formula's opinion of it.
+    assert logged.new_best == Decimal("80.00")
+    assert logged.estimate == Decimal("101.3")
 
 
-async def test_beating_the_estimate_is_a_record(session: AsyncSession) -> None:
+async def test_beating_the_previous_weight_is_a_record(session: AsyncSession) -> None:
     user_id = await _user(session, 4012)
     service = WorkoutService(session)
     bench = await _bench(session, user_id)
@@ -201,7 +203,8 @@ async def test_beating_the_estimate_is_a_record(session: AsyncSession) -> None:
     logged = await service.log(user_id, bench, parse_set_entry("85х8"), now=NOW + timedelta(days=3))
 
     assert logged.is_record
-    assert logged.previous_best == Decimal("101.3")
+    assert logged.previous_best == Decimal("80.00")
+    assert logged.new_best == Decimal("85.00")
 
 
 async def test_a_lighter_set_is_not_a_record(session: AsyncSession) -> None:
@@ -320,3 +323,23 @@ async def test_last_completed_skips_cancelled_sessions(session: AsyncSession) ->
 
     assert summary is not None
     assert summary.total_sets == 1
+
+
+async def test_heavier_for_fewer_reps_is_still_a_record(session: AsyncSession) -> None:
+    """The point of the change: a heavier bar counts, even for one rep.
+
+    By estimated one-rep max, 90x3 loses to 80x8. By the plates on the bar -
+    which is what a lifter means by a personal best - it wins.
+    """
+    user_id = await _user(session, 4020)
+    service = WorkoutService(session)
+    bench = await _bench(session, user_id)
+
+    await service.start(user_id, now=NOW)
+    await service.log(user_id, bench, parse_set_entry("80х8"), now=NOW)
+    logged = await service.log(
+        user_id, bench, parse_set_entry("90х3"), now=NOW + timedelta(minutes=5)
+    )
+
+    assert logged.is_record
+    assert logged.new_best == Decimal("90.00")

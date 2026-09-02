@@ -75,49 +75,96 @@ class ExerciseRepository:
     def _normalise(query: str) -> str:
         return " ".join(query.strip().lower().split())
 
-    def _search_terms(self, needle: str) -> tuple[ColumnElement[bool], Any, Any]:
-        """Match predicate, rank and closeness, built once.
+    def _search_terms(
+        self, needle: str
+    ) -> tuple[ColumnElement[bool], ColumnElement[bool], Any, Any]:
+        """Precise and fuzzy predicates, plus rank and closeness.
 
-        Counting and paging must use the identical predicate: if they drift,
-        the page counter starts lying about a list the user can see.
+        They are built once because counting and paging must use the identical
+        predicate: if they drift, the page counter lies about a list the user
+        can see.
         """
         # Array containment rather than `= ANY(...)`: only @> uses the GIN index.
         alias_hit = Exercise.aliases.bool_op("@>")(cast([needle], ARRAY(Text)))
+        # Muscle group names are the first thing people type. Without this,
+        # "трицепс" matches nothing by name and the trigram search happily
+        # returns biceps work, which differs by a single letter.
+        group_hit = func.lower(MuscleGroup.name_ru) == needle
         name_prefix = Exercise.name_ru.ilike(f"{needle}%")
         name_contains = Exercise.name_ru.ilike(f"%{needle}%")
         closeness = func.word_similarity(needle, Exercise.name_ru)
 
-        matches = or_(alias_hit, name_contains, closeness > WORD_SIMILARITY_THRESHOLD)
-        rank = case((alias_hit, 0), (name_prefix, 1), (name_contains, 2), else_=3)
-        return matches, rank, closeness
+        precise = or_(alias_hit, group_hit, name_contains)
+        fuzzy = closeness > WORD_SIMILARITY_THRESHOLD
+        rank = case(
+            (alias_hit, 0),
+            (group_hit, 1),
+            (name_prefix, 2),
+            (name_contains, 3),
+            else_=4,
+        )
+        return precise, fuzzy, rank, closeness
+
+    def _matching(self, needle: str, user_id: int, *, condition: ColumnElement[bool]) -> Any:
+        return (
+            select(Exercise.id)
+            .join(MuscleGroup, MuscleGroup.id == Exercise.primary_muscle_group_id)
+            .where(self._visible_to(user_id), condition)
+        )
 
     async def search(
         self, query: str, *, user_id: int, limit: int = 10, offset: int = 0
     ) -> list[Exercise]:
-        """Ranked search: exact alias, then prefix, then substring, then fuzzy."""
+        """Ranked search: exact alias, muscle group, prefix, substring, then fuzzy.
+
+        Fuzzy is a FALLBACK, not an addition. Trigrams are generous - "бенч"
+        is close enough to "Бег на дорожке" to clear any threshold that still
+        catches real typos - so mixing fuzzy hits into a query that already
+        matched exactly only adds noise to a correct answer.
+        """
         needle = self._normalise(query)
         if not needle:
             return []
 
-        matches, rank, closeness = self._search_terms(needle)
-        stmt = (
-            select(Exercise)
-            .where(self._visible_to(user_id), matches)
-            # On a tie the shorter name wins: it is usually the base movement
-            # ("Выпады" before "Болгарские выпады").
-            .order_by(rank, closeness.desc(), func.length(Exercise.name_ru), Exercise.name_ru)
-            .offset(offset)
-            .limit(limit)
-        )
-        return list(await self._session.scalars(stmt))
+        precise, fuzzy, rank, closeness = self._search_terms(needle)
+        for condition in (precise, fuzzy):
+            stmt = (
+                select(Exercise)
+                .join(MuscleGroup, MuscleGroup.id == Exercise.primary_muscle_group_id)
+                .where(self._visible_to(user_id), condition)
+                # Inside a muscle group the compound movements come first, the
+                # same order the group listing uses.
+                .order_by(
+                    rank,
+                    Exercise.is_compound.desc(),
+                    closeness.desc(),
+                    func.length(Exercise.name_ru),
+                    Exercise.name_ru,
+                )
+                .offset(offset)
+                .limit(limit)
+            )
+            found = list(await self._session.scalars(stmt))
+            if found:
+                return found
+        return []
 
     async def count_search(self, query: str, *, user_id: int) -> int:
         needle = self._normalise(query)
         if not needle:
             return 0
-        matches, _, _ = self._search_terms(needle)
-        stmt = select(func.count()).select_from(Exercise).where(self._visible_to(user_id), matches)
-        return await self._session.scalar(stmt) or 0
+
+        precise, fuzzy, _, _ = self._search_terms(needle)
+        for condition in (precise, fuzzy):
+            # Counted over a subquery, not select_from(...).where(...): the
+            # predicate references muscle_groups, and without an explicit join
+            # that table joined the FROM unconstrained - a cartesian product
+            # that inflated the page count eightfold while failing nothing.
+            matching = self._matching(needle, user_id, condition=condition).subquery()
+            total = await self._session.scalar(select(func.count()).select_from(matching))
+            if total:
+                return int(total)
+        return 0
 
     async def by_muscle_group(
         self, muscle_group_id: int, *, user_id: int, limit: int = 50, offset: int = 0

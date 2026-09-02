@@ -7,6 +7,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from gym_assistant.bot.keyboards.common import with_cancel
+from gym_assistant.bot.keyboards.workouts import WorkoutCB
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.domain.models import Equipment, Exercise, ExerciseType, MuscleGroup
 
@@ -46,8 +47,15 @@ class ExNewCB(CallbackData, prefix="exn"):
     value: str
 
 
-def menu_keyboard() -> InlineKeyboardMarkup:
+def menu_keyboard(*, workout_open: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    if workout_open:
+        # Browsing the catalogue mid-session must not feel like leaving it.
+        builder.row(
+            InlineKeyboardButton(
+                text=ru.BTN_WORKOUT_PANEL, callback_data=WorkoutCB(action="panel").pack()
+            )
+        )
     builder.button(text=ru.BTN_SEARCH, callback_data=ExMenuCB(action="search"))
     builder.button(text=ru.BTN_GROUPS, callback_data=ExMenuCB(action="groups"))
     builder.button(text=ru.BTN_FAVOURITES, callback_data=ExMenuCB(action="favourites"))

@@ -23,7 +23,7 @@ WEIGHT_STEPS = (Decimal("-5"), Decimal("-2.5"), Decimal("2.5"), Decimal("5"))
 class WorkoutCB(CallbackData, prefix="wo"):
     """Session-level action."""
 
-    action: str  # start | panel | finish | undo | pick | find
+    action: str  # start | panel | finish | undo | find | help | catalogue
 
 
 class WorkoutExerciseCB(CallbackData, prefix="woe"):
@@ -62,6 +62,14 @@ def panel_keyboard(frequent: list[Exercise]) -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(
             text=ru.BTN_WORKOUT_FIND, callback_data=WorkoutCB(action="find").pack()
+        ),
+        InlineKeyboardButton(
+            text=ru.BTN_WORKOUT_CATALOGUE, callback_data=WorkoutCB(action="catalogue").pack()
+        ),
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text=ru.BTN_WORKOUT_HELP, callback_data=WorkoutCB(action="help").pack()
         )
     )
     builder.row(
@@ -125,8 +133,11 @@ def set_entry_keyboard(
     # reachable from here - not two taps away via the session panel.
     builder.row(
         InlineKeyboardButton(
+            text=ru.BTN_WORKOUT_HELP, callback_data=WorkoutCB(action="help").pack()
+        ),
+        InlineKeyboardButton(
             text=ru.BTN_WORKOUT_FINISH, callback_data=WorkoutCB(action="finish").pack()
-        )
+        ),
     )
     return builder.as_markup()
 

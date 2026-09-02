@@ -17,7 +17,8 @@ Accepted, roughly in order of how often they appear:
     60с   1:30      время
     100м            дистанция
     80х8 @8         RPE
-    р 80х8          разминочный
+    р 80х8          разминочный (в начале)
+    80х8 разминка   разминочный (в конце)
 """
 
 from __future__ import annotations
@@ -114,13 +115,23 @@ def _take_rpe(text: str) -> tuple[str, Decimal | None]:
     return (text[: match.start()] + text[match.end() :]).strip(), value
 
 
+def _is_warmup_token(token: str) -> bool:
+    return token in _WARMUP_TOKENS or any(token.startswith(word) for word in _WARMUP_WORDS)
+
+
 def _take_warmup(text: str) -> tuple[str, bool]:
+    """Accepts the marker at either end.
+
+    "разминка 50х4" reads naturally, but so does "50 на 4 разминка" - and
+    the second is what gets typed, because the numbers come to mind first.
+    """
     tokens = text.split()
     if not tokens:
         return text, False
-    head = tokens[0]
-    if head in _WARMUP_TOKENS or any(head.startswith(word) for word in _WARMUP_WORDS):
+    if _is_warmup_token(tokens[0]):
         return " ".join(tokens[1:]).strip(), True
+    if len(tokens) > 1 and _is_warmup_token(tokens[-1]):
+        return " ".join(tokens[:-1]).strip(), True
     return text, False
 
 

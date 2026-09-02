@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
+import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.domain.models import Equipment, ExerciseType
@@ -11,6 +14,11 @@ from gym_assistant.domain.services import (
     ExerciseService,
     ProfileService,
 )
+
+# Read from the seed rather than hard-coded: the catalogue is meant to grow.
+_SEED = yaml.safe_load(pathlib.Path("seeds/exercises.yaml").read_text(encoding="utf-8"))
+SEEDED_GROUPS = len(_SEED["muscle_groups"])
+SEEDED_EXERCISES = len(_SEED["exercises"])
 
 
 async def _user(session: AsyncSession, telegram_id: int) -> int:
@@ -25,8 +33,8 @@ async def test_catalogue_is_seeded(session: AsyncSession) -> None:
     groups = await service.muscle_groups()
     stats = await service.stats(user_id)
 
-    assert len(groups) == 11
-    assert stats.total == 41
+    assert len(groups) == SEEDED_GROUPS
+    assert stats.total == SEEDED_EXERCISES
     assert stats.own == 0
 
 
@@ -195,10 +203,12 @@ async def test_hiding_removes_an_exercise_from_view(session: AsyncSession) -> No
 
     await service.set_hidden(user_id, bench.id, hidden=True)
 
-    assert await service.search("бенч", user_id=user_id) == []
+    # Asserting absence, not emptiness: with the exact match hidden, the fuzzy
+    # fallback offers the nearest thing it can find, which is the point of it.
+    assert bench.id not in {e.id for e in await service.search("бенч", user_id=user_id)}
     assert await service.get(bench.id, user_id=user_id) is None
     # Hiding is per user: it must not touch the shared catalogue.
-    assert await service.search("бенч", user_id=other_id)
+    assert bench.id in {e.id for e in await service.search("бенч", user_id=other_id)}
 
 
 async def test_hiding_is_reversible(session: AsyncSession) -> None:

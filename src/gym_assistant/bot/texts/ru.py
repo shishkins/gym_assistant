@@ -343,8 +343,10 @@ WORKOUT_ENTRY_BODYWEIGHT = "\n\nЗаписать: <b>{reps}</b> повторов
 
 WORKOUT_SET_SAVED = "✅ {value}"
 WORKOUT_SETS_SAVED = "✅ {count} подхода: {value}"
-WORKOUT_RECORD = "🏆 <b>Личный рекорд!</b> Расчётный максимум {best} кг"
-WORKOUT_RECORD_BEATEN = "🏆 <b>Личный рекорд!</b> {previous} → <b>{best}</b> кг"
+# The record is the weight on the bar, so the message shows the set.
+WORKOUT_RECORD = "🏆 <b>Личный рекорд!</b> {value}"
+WORKOUT_RECORD_BEATEN = "🏆 <b>Личный рекорд!</b> {value}\nПрежний максимум: {previous} кг"
+WORKOUT_RECORD_ESTIMATE = "\n<i>Расчётный максимум: ~{estimate} кг</i>"
 
 WORKOUT_SET_UNDONE = "↩️ Убрал: {value}"
 WORKOUT_NOTHING_TO_UNDO = "Отменять нечего — подходов ещё нет."
@@ -395,3 +397,28 @@ BTN_WORKOUT_OTHER = "🔀 Другое упражнение"
 BTN_WORKOUT_FIND = "🔎 Найти упражнение"
 BTN_WORKOUT_PANEL = "🏋️ К тренировке"
 BTN_WARMUP = "🔥 Разминочный"
+
+# --- Input help -----------------------------------------------------------
+
+WORKOUT_INPUT_HELP = (
+    "<b>Как записывать подходы</b>\n\n"
+    "Во время тренировки просто пишите — кнопки не нужны:\n\n"
+    "<code>80х8</code> — вес × повторы\n"
+    "<code>82,5х8</code> — запятая тоже работает\n"
+    "<code>80 8</code> · <code>80x8</code> · <code>80*8</code> · <code>80 на 8</code>"
+    " — то же самое\n"
+    "<code>80х8х3</code> — три одинаковых подхода\n"
+    "<code>жим 80х8</code> — сразу с упражнением\n"
+    "<code>присед</code> — просто переключиться на другое\n\n"
+    "<b>Дополнения</b>\n"
+    "<code>80х8 разминка</code> — разминочный (или <code>р 80х8</code>)\n"
+    "<code>80х8 @8</code> — с оценкой усилия RPE\n\n"
+    "<b>Не только железо</b>\n"
+    "<code>12</code> — повторы со своим весом\n"
+    "<code>60с</code> · <code>1:30</code> — время\n"
+    "<code>100м</code> — дистанция"
+)
+
+BTN_WORKOUT_HELP = "❔ Как записывать"
+BTN_WORKOUT_CATALOGUE = "📖 Справочник"
+BTN_LOG_THIS = "➕ Записать подход"

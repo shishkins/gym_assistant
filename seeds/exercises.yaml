@@ -32,6 +32,7 @@ muscle_groups:
   - { code: glutes,     name_ru: Ягодицы,      sort_order: 90 }
   - { code: calves,     name_ru: Икры,         sort_order: 100 }
   - { code: core,       name_ru: Корпус,       sort_order: 110 }
+  - { code: cardio,     name_ru: Кардио,       sort_order: 120 }
 
 exercises:
 
@@ -661,3 +662,125 @@ exercises:
       и контролируемые.
     mistakes: |
       Сутулость под весом, слишком длинный шаг, наклон в одну сторону.
+
+  # ------------------------------------------------------------ Трицепс (доп.)
+
+  - slug: rope_pushdown
+    name_ru: Разгибание рук на канате
+    aliases: [канат, канатная рукоять, разгибание на канате, трицепс канат]
+    primary: triceps
+    secondary: []
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      В нижней точке кисти разводятся в стороны — так длинная головка
+      включается полнее, чем с прямой рукоятью.
+    mistakes: |
+      Локти уходят вперёд, корпус наваливается на вес.
+
+  - slug: overhead_triceps_extension
+    name_ru: Французский жим сидя с гантелью
+    aliases: [французский сидя, разгибание из-за головы, гантель из-за головы]
+    primary: triceps
+    secondary: []
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Локти смотрят вперёд и остаются на месте. Опускать до растяжения
+      трицепса, не до боли в локте.
+    mistakes: |
+      Разведённые в стороны локти, слишком большой вес.
+
+  - slug: bench_dips
+    name_ru: Отжимания от скамьи
+    aliases: [обратные отжимания, отжимания от скамьи, трицепс от скамьи]
+    primary: triceps
+    secondary: [chest, shoulders]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Спина близко к скамье, локти идут назад, а не в стороны.
+    mistakes: |
+      Слишком глубокое опускание — плечевой сустав уходит в неудобное
+      положение.
+
+  # ------------------------------------------------------------------ Кардио
+
+  - slug: treadmill_run
+    name_ru: Бег на дорожке
+    aliases: [бег, дорожка, беговая дорожка, кардио бег]
+    primary: cardio
+    secondary: [quads, calves, hamstrings]
+    equipment: machine
+    type: distance
+    compound: true
+    video_url:
+    tips: |
+      Записывайте дистанцию: <code>3000м</code>. Наклон дорожки 1–2 %
+      ближе к бегу по улице, чем ровное полотно.
+    mistakes: |
+      Держаться за поручни — это снимает нагрузку и портит технику.
+
+  - slug: stationary_bike
+    name_ru: Велотренажёр
+    aliases: [велотренажёр, вело, велик, сайкл]
+    primary: cardio
+    secondary: [quads, glutes]
+    equipment: machine
+    type: distance
+    compound: true
+    video_url:
+    tips: |
+      Седло на высоте тазобедренного сустава: в нижней точке колено
+      почти выпрямлено.
+    mistakes: |
+      Слишком низкое седло, нагрузка уходит в колени.
+
+  - slug: rowing_machine
+    name_ru: Гребной тренажёр
+    aliases: [гребля, гребной, тяга на гребном]
+    primary: cardio
+    secondary: [back, quads, biceps]
+    equipment: machine
+    type: distance
+    compound: true
+    video_url:
+    tips: |
+      Порядок движения: ноги, корпус, руки — и в обратном порядке на возврате.
+    mistakes: |
+      Тянуть руками раньше ног, круглая спина.
+
+  - slug: elliptical
+    name_ru: Эллиптический тренажёр
+    aliases: [эллипс, орбитрек, эллиптический]
+    primary: cardio
+    secondary: [quads, glutes]
+    equipment: machine
+    type: time
+    compound: true
+    video_url:
+    tips: |
+      Записывайте время: <code>20мин</code>. Корпус вертикально, не виснуть
+      на поручнях.
+    mistakes: |
+      Перенос веса на руки.
+
+  - slug: jump_rope
+    name_ru: Скакалка
+    aliases: [скакалка, прыжки на скакалке]
+    primary: cardio
+    secondary: [calves, shoulders]
+    equipment: other
+    type: time
+    compound: true
+    video_url:
+    tips: |
+      Прыжки низкие, вращение кистями, а не всей рукой.
+    mistakes: |
+      Высокие прыжки и вращение от плеча — быстро выматывает без пользы.

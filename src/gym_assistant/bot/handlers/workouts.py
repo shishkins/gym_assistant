@@ -26,7 +26,7 @@ from gym_assistant.bot.keyboards import (
     set_entry_keyboard,
     start_keyboard,
 )
-from gym_assistant.bot.states import WorkoutFlow
+from gym_assistant.bot.states import ExerciseSearch, WorkoutFlow
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.domain.models import Exercise, User, WorkoutSet
 from gym_assistant.domain.parsing import ParsedSet, ValueParseError, parse_set_entry
@@ -176,6 +176,17 @@ async def workout_action(
                     ru.WORKOUT_PICK_EXERCISE,
                     reply_markup=cancel_keyboard("workout_search").as_markup(),
                 )
+
+        case "help":
+            # Discoverability: the text formats are the fast path, and until
+            # now nothing in the interface mentioned they existed.
+            message = callback.message
+            if isinstance(message, Message):
+                await message.answer(ru.WORKOUT_INPUT_HELP)
+
+        case "catalogue":
+            # The session stays open; the catalogue offers a way back.
+            await show_catalogue(callback, session, state, user)
 
         case "undo":
             await _undo(callback, service, state, user)
@@ -389,15 +400,20 @@ async def _store(
         return
 
     await message.answer(_confirmation(logged.sets))
-    if logged.is_record and logged.new_best is not None:
-        await message.answer(
-            ru.WORKOUT_RECORD.format(best=render.format_decimal(logged.new_best))
+    if logged.is_record:
+        value = render.render_set_value(logged.sets[0])
+        text = (
+            ru.WORKOUT_RECORD.format(value=value)
             if logged.previous_best is None
             else ru.WORKOUT_RECORD_BEATEN.format(
-                previous=render.format_decimal(logged.previous_best),
-                best=render.format_decimal(logged.new_best),
+                value=value, previous=render.format_decimal(logged.previous_best)
             )
         )
+        if logged.estimate is not None:
+            text += ru.WORKOUT_RECORD_ESTIMATE.format(
+                estimate=render.format_decimal(logged.estimate)
+            )
+        await message.answer(text)
 
     # Keep the pending values so the next identical set is one tap away.
     await state.update_data(
@@ -414,3 +430,16 @@ def _confirmation(stored: list[WorkoutSet]) -> str:
     if len(stored) == 1:
         return ru.WORKOUT_SET_SAVED.format(value=value)
     return ru.WORKOUT_SETS_SAVED.format(count=len(stored), value=value)
+
+
+async def show_catalogue(
+    callback: CallbackQuery, session: AsyncSession, state: FSMContext, user: User
+) -> None:
+    """Opens the catalogue without ending the session."""
+    from gym_assistant.bot.handlers.exercises import show_menu as show_catalogue_menu
+
+    message = callback.message
+    if not isinstance(message, Message):
+        return
+    await state.set_state(ExerciseSearch.query)
+    await show_catalogue_menu(message, state, ExerciseService(session), user, workout_open=True)

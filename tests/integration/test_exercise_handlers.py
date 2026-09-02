@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.config import Settings
 from tests.integration.bot_harness import BotHarness, build_harness
+from tests.integration.test_exercise_service import SEEDED_EXERCISES
 
 
 @pytest_asyncio.fixture
@@ -24,7 +25,7 @@ async def test_menu_opens(bot: BotHarness) -> None:
     await bot.send("/exercises")
 
     assert "Справочник упражнений" in bot.session.last_text
-    assert "41" in bot.session.last_text
+    assert str(SEEDED_EXERCISES) in bot.session.last_text
 
 
 async def test_inline_search(bot: BotHarness) -> None:

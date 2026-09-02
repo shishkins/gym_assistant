@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gym_assistant.analytics.metrics import (
     best_estimate,
     estimated_one_rep_max,
+    heaviest_weight,
     total_tonnage,
     working_sets,
 )
@@ -55,13 +56,19 @@ class ExerciseHistory:
 
 @dataclass(frozen=True, slots=True)
 class LoggedSets:
-    """The result of one entry: what was stored and what it beat."""
+    """The result of one entry: what was stored and what it beat.
+
+    A record is the heaviest weight actually lifted, not the best estimated
+    one-rep max. The estimate is a useful trend line, but nobody thinks of a
+    formula's output as their personal best - they think of the plates.
+    """
 
     exercise: Exercise
     sets: list[WorkoutSet]
     is_record: bool
     previous_best: Decimal | None
     new_best: Decimal | None
+    estimate: Decimal | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,7 +210,7 @@ class WorkoutService:
             raise NoOpenWorkoutError("no session is running")
 
         moment = now or datetime.now(UTC)
-        previous_best = await self._best_before(user_id, exercise.id, moment)
+        previous_best = await self._heaviest_before(user_id, exercise.id, moment)
 
         order_index, first_set_index = await self._workouts.next_indexes(workout.id, exercise.id)
 
@@ -227,9 +234,14 @@ class WorkoutService:
                 )
             )
 
-        new_best = None
-        if parsed.weight_kg is not None and parsed.reps is not None and not parsed.is_warmup:
-            new_best = estimated_one_rep_max(parsed.weight_kg, parsed.reps)
+        # A warm-up never sets a record, however heavy it happens to be.
+        is_working = parsed.weight_kg is not None and not parsed.is_warmup
+        new_best = parsed.weight_kg if is_working else None
+        estimate = (
+            estimated_one_rep_max(parsed.weight_kg, parsed.reps)
+            if is_working and parsed.weight_kg is not None and parsed.reps is not None
+            else None
+        )
 
         is_record = new_best is not None and (previous_best is None or new_best > previous_best)
         return LoggedSets(
@@ -238,6 +250,7 @@ class WorkoutService:
             is_record=is_record,
             previous_best=previous_best,
             new_best=new_best,
+            estimate=estimate,
         )
 
     async def undo_last(self, user_id: int) -> WorkoutSet | None:
@@ -281,10 +294,10 @@ class WorkoutService:
                 continue
             by_exercise.append((exercise, items))
 
-            achieved = best_estimate(items)
+            achieved = heaviest_weight(items)
             if achieved is None:
                 continue
-            before = await self._best_before(workout.user_id, exercise_id, workout.started_at)
+            before = await self._heaviest_before(workout.user_id, exercise_id, workout.started_at)
             if before is None or achieved > before:
                 records.append((exercise, achieved))
 
@@ -301,10 +314,10 @@ class WorkoutService:
             records=records,
         )
 
-    async def _best_before(
+    async def _heaviest_before(
         self, user_id: int, exercise_id: int, moment: datetime
     ) -> Decimal | None:
-        """Best estimate from everything logged before ``moment``.
+        """Heaviest working weight from everything logged before ``moment``.
 
         Reads the exercise's history rather than aggregating in SQL so the
         formula stays in one place. At personal scale that history is a few
@@ -312,4 +325,4 @@ class WorkoutService:
         """
         history = await self._workouts.all_sets_of_exercise(user_id, exercise_id)
         earlier = [item for item in history if item.performed_at < moment]
-        return best_estimate(earlier)
+        return heaviest_weight(earlier)

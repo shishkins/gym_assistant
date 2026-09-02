@@ -283,3 +283,68 @@ async def test_commands_still_work_during_a_workout(bot: BotHarness) -> None:
     await bot.send("/weight 84")
 
     assert "Записал" in bot.session.last_text
+
+
+# --- Follow-ups from the iteration 3 review ------------------------------
+
+
+async def test_warmup_marker_at_the_end(bot: BotHarness, session: AsyncSession) -> None:
+    """ "50 на 4 разминка" is how it gets typed: numbers come to mind first."""
+    await bot.send("/workout")
+
+    await bot.send("жим 50 на 4 разминка")
+
+    stored = await _sets(session)
+    assert stored[0].is_warmup
+
+
+async def test_record_names_the_set_not_a_formula(bot: BotHarness) -> None:
+    await bot.send("/workout")
+
+    await bot.send("жим 80х8")
+
+    joined = " ".join(bot.session.texts)
+    assert "Личный рекорд" in joined
+    assert "80 × 8" in joined
+
+
+async def test_heavier_for_fewer_reps_is_a_record(bot: BotHarness) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    bot.session.clear()
+    await bot.send("90х3")
+
+    assert "Личный рекорд" in " ".join(bot.session.texts)
+
+
+async def test_input_help_is_reachable(bot: BotHarness) -> None:
+    """The text formats are the fast path; nothing announced they existed."""
+    await bot.send("/workout")
+
+    await bot.tap_button("Как записывать")
+
+    assert "Как записывать подходы" in bot.session.last_text
+
+
+async def test_catalogue_is_reachable_and_leads_back(bot: BotHarness) -> None:
+    await bot.send("/workout")
+
+    await bot.tap_button("Справочник")
+    assert "Справочник упражнений" in bot.session.last_text
+
+    await bot.tap_button("К тренировке")
+    assert "Тренировка идёт" in bot.session.last_text
+
+
+async def test_muscle_group_search_finds_the_right_muscle(bot: BotHarness) -> None:
+    """ "трицепс" used to return biceps work - one letter apart in trigrams."""
+    await bot.send("/exercises трицепс")
+
+    assert bot.session.button_with("Разгибание рук на блоке")
+
+
+async def test_cardio_is_in_the_catalogue(bot: BotHarness) -> None:
+    await bot.send("/exercises бег")
+
+    assert bot.session.button_with("Бег на дорожке")

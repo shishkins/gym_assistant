@@ -64,7 +64,12 @@ async def _menu_text(service: ExerciseService, user: User) -> str:
 
 
 async def show_menu(
-    message: Message, state: FSMContext, service: ExerciseService, user: User
+    message: Message,
+    state: FSMContext,
+    service: ExerciseService,
+    user: User,
+    *,
+    workout_open: bool = False,
 ) -> None:
     """Opens the catalogue and leaves search armed.
 
@@ -72,7 +77,10 @@ async def show_menu(
     repeatedly during a session, and retyping the command each time is friction.
     """
     await state.set_state(ExerciseSearch.query)
-    await message.answer(await _menu_text(service, user), reply_markup=menu_keyboard())
+    await message.answer(
+        await _menu_text(service, user),
+        reply_markup=menu_keyboard(workout_open=workout_open),
+    )
 
 
 # --- Paged lists ----------------------------------------------------------
