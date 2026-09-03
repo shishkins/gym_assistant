@@ -267,7 +267,9 @@ async def test_ai_usage_shows_only_your_own_spending(
     await _subscribe(session)
     other = await ProfileService(session).get_or_create_user(4242, username="friend")
     await UsageService(session).record(
-        user_id=other.id, session_id=None, model="claude-opus-5",
+        user_id=other.id,
+        session_id=None,
+        model="claude-opus-5",
         tokens=Tokens(input=1_000_000, output=1_000_000),
     )
 
@@ -300,12 +302,12 @@ async def test_the_whole_bill_is_admin_only(
     assert "По людям" not in bot.session.last_text
 
 
-async def test_an_admin_sees_the_whole_bill(
-    admin_bot: BotHarness, session: AsyncSession
-) -> None:
+async def test_an_admin_sees_the_whole_bill(admin_bot: BotHarness, session: AsyncSession) -> None:
     other = await ProfileService(session).get_or_create_user(4242, username="friend")
     await UsageService(session).record(
-        user_id=other.id, session_id=None, model="claude-opus-5",
+        user_id=other.id,
+        session_id=None,
+        model="claude-opus-5",
         tokens=Tokens(input=1_000_000),
     )
 
