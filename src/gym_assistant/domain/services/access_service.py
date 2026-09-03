@@ -125,16 +125,21 @@ class AccessService:
         )
         return user
 
-    async def privileged(self) -> list[tuple[User, UserAccess]]:
-        """Everyone who is anything other than an ordinary user.
+    async def everyone(self, *, limit: int = 50) -> list[tuple[User, UserAccess | None]]:
+        """Every person who has ever opened the bot, newest first.
 
-        Ordinary users have no row, so this lists exactly the people an
-        admin has ever done something about - which is the useful list.
+        Used to list only those with a grant, on the reasoning that ordinary
+        users have no row and so are not interesting. That was wrong twice
+        over: an admin wants to know WHO is using the bot before deciding
+        anything about them, and with the whitelist empty anyone can walk in.
+        A list that omits exactly the people you have not looked at yet is
+        the wrong list.
         """
         rows = await self._session.execute(
             select(User, UserAccess)
-            .join(UserAccess, UserAccess.user_id == User.id)
-            .order_by(UserAccess.granted_at.desc())
+            .outerjoin(UserAccess, UserAccess.user_id == User.id)
+            .order_by(User.created_at.desc())
+            .limit(limit)
         )
         return [(user, access) for user, access in rows]
 

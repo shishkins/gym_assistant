@@ -23,9 +23,16 @@ log = structlog.get_logger(__name__)
 # starts fresh instead of dragging yesterday's context - and its cost - along.
 IDLE_HOURS = 6
 
-# Turns kept when replaying history. Each one is resent in full on every
-# request, so this is a direct multiplier on the bill.
+# Turns kept when replaying history. Each one is resent on every request,
+# so this is a direct multiplier on the bill.
 MAX_TURNS = 12
+
+# Tool results are the bulkiest thing in a conversation - raw JSON of
+# every weigh-in and every set. Past this many turns back, the numbers
+# have already been said out loud in the answer, and carrying the source
+# rows along buys nothing but input tokens.
+KEEP_TOOL_RESULTS_FOR = 4
+ELIDED = '{"note": "результаты этого вызова опущены, см. ответ выше"}'
 
 
 class ConversationService:
@@ -70,7 +77,7 @@ class ConversationService:
         cut = len(turns) - MAX_TURNS
         while cut < len(turns) and not _is_plain_user_turn(turns[cut]):
             cut += 1
-        return turns[cut:]
+        return _elide_old_tool_results(turns[cut:])
 
     async def append(self, session_id: int, turns: list[dict[str, Any]]) -> None:
         for turn in turns:
@@ -93,6 +100,33 @@ class ConversationService:
         )
         await self._session.flush()
         return result.first() is not None
+
+
+def _elide_old_tool_results(turns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Strips the payload out of tool results the conversation has moved past.
+
+    The blocks stay - dropping a tool_result whose tool_use is still there
+    makes the request invalid - but their content shrinks to a note. What the
+    numbers meant is already in the assistant's answer right below them.
+    """
+    keep_from = max(0, len(turns) - KEEP_TOOL_RESULTS_FOR)
+    trimmed: list[dict[str, Any]] = []
+
+    for index, turn in enumerate(turns):
+        content = turn.get("content")
+        if index >= keep_from or not isinstance(content, list):
+            trimmed.append(turn)
+            continue
+
+        blocks = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "tool_result":
+                blocks.append({**block, "content": ELIDED})
+            else:
+                blocks.append(block)
+        trimmed.append({**turn, "content": blocks})
+
+    return trimmed
 
 
 def _is_plain_user_turn(turn: dict[str, Any]) -> bool:

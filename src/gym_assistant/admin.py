@@ -58,16 +58,25 @@ async def _revoke(telegram_id: int) -> None:
 async def _list() -> None:
     engine = create_engine(get_settings().database_url)
     async with create_session_factory(engine)() as session:
-        rows = await AccessService(session).privileged()
+        rows = await AccessService(session).everyone()
         if not rows:
-            print("Выданных доступов нет — все пользователи обычные.")
+            print("Ботом ещё никто не пользовался.")
         now = datetime.now(UTC)
         for user, stored in rows:
             current = resolve(stored, now=now)
-            lapsed = " (истёк)" if current.role is not Role(stored.role) else ""
-            until = stored.expires_at.date().isoformat() if stored.expires_at else "бессрочно"
+            lapsed = (
+                " (истёк)"
+                if stored is not None and current.role is not Role(stored.role)
+                else ""
+            )
+            if stored is None:
+                until = "-"
+            elif current.expires_at:
+                until = current.expires_at.date().isoformat()
+            else:
+                until = "бессрочно"
             name = f"@{user.username}" if user.username else (user.first_name or "—")
-            print(f"{user.telegram_id:<14} {Role(stored.role).value:<18} {until}{lapsed}  {name}")
+            print(f"{user.telegram_id:<14} {current.role.value:<18} {until}{lapsed}  {name}")
     await engine.dispose()
 
 

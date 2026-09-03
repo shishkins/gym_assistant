@@ -83,3 +83,52 @@ def test_the_first_of_the_month_is_already_the_new_month() -> None:
 
     assert month_start(moment) <= moment
     assert month_start(moment).month == 9
+
+
+# --- the cache breakpoint -------------------------------------------------
+#
+# 60% of the first month's bill was fresh input: the system prompt was cached
+# from the start, the conversation never was, and every turn resent the whole
+# exchange at full price.
+
+
+def test_the_last_turn_carries_the_cache_mark() -> None:
+    from gym_assistant.ai.client import _cached
+
+    marked = _cached([{"role": "user", "content": "вопрос"}])
+
+    assert marked[-1]["content"][0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_only_the_last_turn_is_marked() -> None:
+    """Four breakpoints per request is the limit; one at the end is enough."""
+    from gym_assistant.ai.client import _cached
+
+    marked = _cached(
+        [
+            {"role": "user", "content": "первый"},
+            {"role": "assistant", "content": [{"type": "text", "text": "ответ"}]},
+            {"role": "user", "content": "второй"},
+        ]
+    )
+
+    assert "cache_control" not in str(marked[0])
+    assert "cache_control" not in str(marked[1])
+    assert "cache_control" in str(marked[2])
+
+
+def test_marking_does_not_touch_what_gets_stored() -> None:
+    """Stored history must stay byte-identical to what was sent before the
+    mark - a breakpoint leaking into the database would be replayed as data."""
+    from gym_assistant.ai.client import _cached
+
+    original = [{"role": "user", "content": [{"type": "text", "text": "вопрос"}]}]
+    _cached(original)
+
+    assert original == [{"role": "user", "content": [{"type": "text", "text": "вопрос"}]}]
+
+
+def test_an_empty_conversation_is_left_alone() -> None:
+    from gym_assistant.ai.client import _cached
+
+    assert _cached([]) == []

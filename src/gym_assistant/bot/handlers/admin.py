@@ -128,12 +128,13 @@ async def cmd_revoke(message: Message, command: CommandObject, session: AsyncSes
 
 @router.message(Command("users"))
 async def cmd_users(message: Message, session: AsyncSession) -> None:
-    """Everyone who is not an ordinary user.
+    """Everyone who has ever opened the bot, newest first.
 
-    Ordinary users have no row at all, so this is exactly the list of people
-    somebody has decided something about - which is the list worth reading.
+    Used to list only people with a grant. That hid exactly the ones an
+    admin has not decided anything about yet - and with the whitelist empty,
+    those are the ones worth seeing.
     """
-    rows = await AccessService(session).privileged()
+    rows = await AccessService(session).everyone()
     if not rows:
         await message.answer(ru.ADMIN_USERS_EMPTY)
         return
@@ -142,16 +143,20 @@ async def cmd_users(message: Message, session: AsyncSession) -> None:
     lines = []
     for target, stored in rows:
         current = resolve(stored, now=now)
-        lapsed = current.role is not Role(stored.role)
+        lapsed = stored is not None and current.role is not Role(stored.role)
         lines.append(
             ru.ADMIN_USER_LINE.format(
                 who=_who(target),
                 telegram_id=target.telegram_id,
-                role=ROLE_LABELS[Role(stored.role)],
-                until=_until(stored.expires_at, lapsed=lapsed),
+                role=ROLE_LABELS[current.role],
+                until=_until(current.expires_at, lapsed=lapsed)
+                if stored is not None
+                else ru.ADMIN_NO_GRANT,
             )
         )
-    await message.answer(ru.ADMIN_USERS_HEADER + "\n".join(lines))
+    await message.answer(
+        ru.ADMIN_USERS_HEADER.format(count=len(rows)) + "\n".join(lines)
+    )
 
 
 def _who(target: User) -> str:

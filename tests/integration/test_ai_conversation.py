@@ -136,3 +136,67 @@ async def test_trimming_never_leaves_a_tool_use_without_its_result(
     first = history[0]
     assert first["role"] == "user"
     assert isinstance(first["content"], str), "история начинается с результата инструмента"
+
+
+async def test_old_tool_results_lose_their_payload(session: AsyncSession) -> None:
+    """Raw tool JSON is the bulkiest thing in a conversation and the first
+    thing worth dropping: the numbers are already in the answer below it."""
+    user_id = await _user_id(session)
+    service = ConversationService(session)
+    talk = await service.active(user_id)
+
+    for index in range(6):
+        await service.append(talk.id, [_question(f"вопрос {index}"), *_tool_call()])
+
+    history = await service.history(talk.id)
+    payloads = [
+        block["content"]
+        for turn in history
+        if isinstance(turn["content"], list)
+        for block in turn["content"]
+        if isinstance(block, dict) and block.get("type") == "tool_result"
+    ]
+
+    assert payloads, "в истории нет результатов инструментов — тест бесполезен"
+    assert any("опущены" in text for text in payloads), "старые результаты не урезаны"
+
+
+async def test_recent_tool_results_are_kept_intact(session: AsyncSession) -> None:
+    """The model still needs the numbers it is answering about right now."""
+    user_id = await _user_id(session)
+    service = ConversationService(session)
+    talk = await service.active(user_id)
+
+    await service.append(talk.id, [_question("вопрос"), *_tool_call()])
+
+    history = await service.history(talk.id)
+    last = history[-1]["content"][0]
+    assert last["content"] == "{}", "свежий результат урезали"
+
+
+async def test_elision_never_drops_a_tool_result_block(session: AsyncSession) -> None:
+    """A tool_use whose result vanished makes the whole request invalid."""
+    user_id = await _user_id(session)
+    service = ConversationService(session)
+    talk = await service.active(user_id)
+
+    for index in range(6):
+        await service.append(talk.id, [_question(f"вопрос {index}"), *_tool_call()])
+
+    history = await service.history(talk.id)
+    uses = sum(
+        1
+        for turn in history
+        if isinstance(turn["content"], list)
+        for block in turn["content"]
+        if isinstance(block, dict) and block.get("type") == "tool_use"
+    )
+    results = sum(
+        1
+        for turn in history
+        if isinstance(turn["content"], list)
+        for block in turn["content"]
+        if isinstance(block, dict) and block.get("type") == "tool_result"
+    )
+
+    assert uses == results, f"{uses} вызовов против {results} результатов"

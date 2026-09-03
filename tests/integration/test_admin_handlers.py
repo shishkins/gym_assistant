@@ -192,7 +192,36 @@ async def test_users_lists_only_the_people_with_a_grant(
 
 
 async def test_users_on_a_fresh_database(admin_bot: BotHarness) -> None:
-    """The owner themselves is a grant, so this is never truly empty."""
+    """The owner is a user, so the list is never truly empty."""
     await admin_bot.send("/users")
 
-    assert "Выданные доступы" in admin_bot.session.last_text
+    assert "Пользователи бота" in admin_bot.session.last_text
+
+
+async def test_users_lists_people_with_no_grant_too(
+    admin_bot: BotHarness, session: AsyncSession
+) -> None:
+    """Reported in the iteration 5 review: "не вижу в /users всех
+    пользователей-друзей".
+
+    The list used to cover only grants, which hid exactly the people an
+    admin has not decided anything about - and with the whitelist empty,
+    those are the ones worth seeing.
+    """
+    await _other_user(session)
+
+    admin_bot.session.clear()
+    await admin_bot.send("/users")
+
+    assert "friend" in admin_bot.session.last_text
+    assert "обычный пользователь" in admin_bot.session.last_text
+
+
+async def test_users_counts_everyone(admin_bot: BotHarness, session: AsyncSession) -> None:
+    await _other_user(session)
+    await ProfileService(session).get_or_create_user(1234, username="third")
+
+    admin_bot.session.clear()
+    await admin_bot.send("/users")
+
+    assert "third" in admin_bot.session.last_text

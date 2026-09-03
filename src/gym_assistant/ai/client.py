@@ -16,7 +16,7 @@ from typing import Any, cast
 
 import anthropic
 import structlog
-from anthropic.types import MessageParam, ToolParam
+from anthropic.types import MessageParam, OutputConfigParam, ToolParam
 
 from gym_assistant.ai import tools
 from gym_assistant.ai.prompts import SYSTEM_PROMPT, brief
@@ -29,6 +29,11 @@ log = structlog.get_logger(__name__)
 # model is going in circles, and every extra turn resends the whole exchange.
 MAX_TOOL_ROUNDS = 6
 MAX_TOKENS = 2048
+
+# The system prompt was cached from the start; the conversation was not,
+# and that is where the money went - 60% of the first bill was fresh
+# input, because every turn resent the whole exchange at full price.
+EFFORT = "medium"
 
 
 class BudgetExceededError(RuntimeError):
@@ -174,6 +179,10 @@ class AiAssistant:
             return await self._client.messages.create(
                 model=self._settings.ai_model_main,
                 max_tokens=MAX_TOKENS,
+                # Effort below the default `high`: the thinking here is
+                # "read these numbers and say what they mean", not a problem
+                # to solve. Measured at 31% of the bill in output tokens.
+                output_config=cast("OutputConfigParam", {"effort": EFFORT}),
                 # Cached by exact bytes, so the prefix is frozen: system
                 # prompt then tools, nothing per-user in either.
                 system=[
@@ -184,7 +193,7 @@ class AiAssistant:
                     }
                 ],
                 tools=cast("list[ToolParam]", tools.TOOL_DEFINITIONS),
-                messages=cast("list[MessageParam]", messages),
+                messages=cast("list[MessageParam]", _cached(messages)),
             )
         except anthropic.APIStatusError as exc:
             log.warning("ai_api_error", status=exc.status_code, message=exc.message)
@@ -218,6 +227,33 @@ class AiAssistant:
             "content": json.dumps(payload, ensure_ascii=False),
             "is_error": bool(isinstance(payload, dict) and payload.get("error")),
         }
+
+
+def _cached(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Marks the end of the conversation as a cache breakpoint.
+
+    Everything before it - system prompt, tools, and now the exchange so far -
+    is read back at a tenth of the price on the next turn instead of being
+    charged again in full. Only the newest turn is fresh.
+
+    The mark goes on a copy: mutating the caller's list would put a breakpoint
+    into what gets stored, and stored history has to stay byte-identical to
+    what was sent.
+    """
+    if not messages:
+        return messages
+
+    head, last = messages[:-1], dict(messages[-1])
+    content = last.get("content")
+    if isinstance(content, str):
+        last["content"] = [
+            {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
+        ]
+    elif isinstance(content, list) and content:
+        blocks = [dict(block) for block in content]
+        blocks[-1]["cache_control"] = {"type": "ephemeral"}
+        last["content"] = blocks
+    return [*head, last]
 
 
 def _text_of(response: Any) -> str:

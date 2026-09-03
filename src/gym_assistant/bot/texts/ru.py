@@ -544,12 +544,10 @@ ADMIN_USER_UNKNOWN = (
 ADMIN_GRANTED = "{who} → <b>{role}</b>, {until}."
 ADMIN_REVOKED = "{who} снова обычный пользователь."
 ADMIN_NOTHING_TO_REVOKE = "У него и так обычный доступ."
-ADMIN_USERS_HEADER = "👥 <b>Выданные доступы</b>\n\n"
+ADMIN_USERS_HEADER = "👥 <b>Пользователи бота</b> · {count}\n\n"
 ADMIN_USER_LINE = "{who} · <code>{telegram_id}</code>\n  {role}, {until}"
-ADMIN_USERS_EMPTY = (
-    "Никому ничего не выдано — все пользователи обычные.\n\n"
-    "Выдать: <code>/grant &lt;telegram_id&gt; sub 30</code>"
-)
+ADMIN_NO_GRANT = "ничего не выдавалось"
+ADMIN_USERS_EMPTY = "Ботом ещё никто не пользовался."
 
 ACCESS_NEEDS_SUBSCRIPTION = (
     "Эта возможность доступна по подписке.\n\n"
