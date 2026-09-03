@@ -276,6 +276,72 @@ async def test_search_inside_a_workout(bot: BotHarness) -> None:
     assert bot.session.button_with("Приседания со штангой")
 
 
+async def _add_own(bot: BotHarness, name: str) -> None:
+    """Creates a personal exercise through the catalogue wizard."""
+    await bot.send("/exercises")
+    await bot.tap_button("Добавить своё")
+    await bot.send(name)
+    await bot.tap_button("Грудь")
+    await bot.tap_button("Штанга")
+    await bot.tap_button("Вес")
+
+
+async def test_search_inside_a_workout_is_paged(bot: BotHarness) -> None:
+    """Reported after iteration 4: this list cut off and offered no way on.
+
+    The seeded catalogue has fewer matches than a page holds, so the test
+    creates enough to overflow - the same reason the catalogue's own paging
+    was invisible in real use.
+    """
+    for index in range(9):
+        await _add_own(bot, f"Жим особенный номер {index}")
+
+    await bot.send("/workout")
+    await bot.tap_button("Найти упражнение")
+    await bot.send("жим")
+
+    assert bot.session.button_with("›"), "нет кнопки следующей страницы"
+    assert bot.session.button_with("1/")
+
+
+async def test_the_second_page_of_a_search_is_reachable(bot: BotHarness) -> None:
+    for index in range(9):
+        await _add_own(bot, f"Жим особенный номер {index}")
+
+    await bot.send("/workout")
+    await bot.tap_button("Найти упражнение")
+    await bot.send("жим")
+    first = {
+        button.text
+        for row in (bot.session.last_markup.inline_keyboard if bot.session.last_markup else [])
+        for button in row
+    }
+
+    await bot.tap_button("›")
+    second = {
+        button.text
+        for row in (bot.session.last_markup.inline_keyboard if bot.session.last_markup else [])
+        for button in row
+    }
+
+    assert second - first, "вторая страница показала то же самое"
+
+
+async def test_a_search_can_be_abandoned_without_ending_the_session(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    """Before this, the only way out of a wrong search was /cancel."""
+    await bot.send("/workout")
+    await bot.tap_button("Найти упражнение")
+    await bot.send("присед")
+
+    await bot.tap_button("К тренировке")
+
+    assert "Тренировка идёт" in bot.session.last_text
+    user = await ProfileService(session).get_or_create_user(777)
+    assert await WorkoutService(session).open_workout(user.id) is not None
+
+
 async def test_commands_still_work_during_a_workout(bot: BotHarness) -> None:
     """A session must not swallow the rest of the bot."""
     await bot.send("/workout")

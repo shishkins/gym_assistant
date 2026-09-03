@@ -41,6 +41,58 @@ class SetCommitCB(CallbackData, prefix="woc"):
     warmup: bool = False
 
 
+class WorkoutSearchPageCB(CallbackData, prefix="wosp"):
+    """A page of search results inside a running session."""
+
+    page: int = 0
+
+
+def search_results_keyboard(
+    exercises: list[Exercise], *, page: int = 0, total_pages: int = 1
+) -> InlineKeyboardMarkup:
+    """Search results inside a session, paged like every other list.
+
+    This one was missed when the catalogue lists were unified: it cut the
+    results off at a page and offered no way to the rest, so an exercise that
+    ranked ninth simply did not exist as far as the session was concerned.
+    """
+    builder = InlineKeyboardBuilder()
+    for exercise in exercises:
+        builder.button(
+            text=exercise.name_ru, callback_data=WorkoutExerciseCB(exercise_id=exercise.id)
+        )
+    builder.adjust(1)
+
+    if total_pages > 1:
+
+        def step(delta: int) -> InlineKeyboardButton:
+            target = page + delta
+            if 0 <= target < total_pages:
+                return InlineKeyboardButton(
+                    text=ru.BTN_PREV_PAGE if delta < 0 else ru.BTN_NEXT_PAGE,
+                    callback_data=WorkoutSearchPageCB(page=target).pack(),
+                )
+            return InlineKeyboardButton(text=" ", callback_data=WorkoutCB(action="noop").pack())
+
+        builder.row(
+            step(-1),
+            InlineKeyboardButton(
+                text=ru.PAGE_INDICATOR.format(page=page + 1, total=total_pages),
+                callback_data=WorkoutCB(action="noop").pack(),
+            ),
+            step(1),
+        )
+
+    # Without this the only way out of a wrong search was /cancel, which
+    # also ends the session.
+    builder.row(
+        InlineKeyboardButton(
+            text=ru.BTN_WORKOUT_PANEL, callback_data=WorkoutCB(action="panel").pack()
+        )
+    )
+    return builder.as_markup()
+
+
 def start_keyboard(*, is_open: bool) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(

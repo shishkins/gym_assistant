@@ -13,7 +13,6 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.bot.keyboards import (
@@ -21,8 +20,10 @@ from gym_assistant.bot.keyboards import (
     SetCommitCB,
     WorkoutCB,
     WorkoutExerciseCB,
+    WorkoutSearchPageCB,
     cancel_keyboard,
     panel_keyboard,
+    search_results_keyboard,
     set_entry_keyboard,
     start_keyboard,
 )
@@ -252,26 +253,56 @@ async def search_exercise(
         await message.answer(ru.WORKOUT_PICK_EXERCISE)
         return
 
-    found = await ExerciseService(session).search(message.text, user_id=user.id, limit=SEARCH_LIMIT)
-    if not found:
+    service = ExerciseService(session)
+    total = await service.count_search(message.text, user_id=user.id)
+    if total == 0:
         await message.answer(ru.WORKOUT_EXERCISE_NOT_FOUND.format(query=message.text))
         return
 
+    # Remembered so the pager has something to page through.
     await state.set_state(WorkoutFlow.active)
-    await message.answer(
-        ru.WORKOUT_PICK_EXERCISE,
-        reply_markup=_picker(found),
+    await state.update_data(search_query=message.text)
+    text, markup = await _search_page(service, user, message.text, page=0)
+    await message.answer(text, reply_markup=markup)
+
+
+@router.callback_query(WorkoutSearchPageCB.filter())
+async def search_page(
+    callback: CallbackQuery,
+    callback_data: WorkoutSearchPageCB,
+    state: FSMContext,
+    session: AsyncSession,
+    user: User,
+) -> None:
+    await callback.answer()
+    query = (await state.get_data()).get("search_query")
+    message = callback.message
+    if not query or not isinstance(message, Message):
+        return
+
+    text, markup = await _search_page(
+        ExerciseService(session), user, query, page=callback_data.page
     )
+    await _edit(callback, text, markup)
 
 
-def _picker(exercises: list[Exercise]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for exercise in exercises:
-        builder.button(
-            text=exercise.name_ru, callback_data=WorkoutExerciseCB(exercise_id=exercise.id)
+async def _search_page(
+    service: ExerciseService, user: User, query: str, *, page: int
+) -> tuple[str, InlineKeyboardMarkup]:
+    total = await service.count_search(query, user_id=user.id)
+    total_pages = max(1, -(-total // SEARCH_LIMIT))
+    page = min(max(page, 0), total_pages - 1)
+
+    found = await service.search(
+        query, user_id=user.id, limit=SEARCH_LIMIT, offset=page * SEARCH_LIMIT
+    )
+    text = ru.WORKOUT_PICK_EXERCISE
+    if total_pages > 1:
+        first = page * SEARCH_LIMIT + 1
+        text += "\n\n" + ru.LIST_COUNTER.format(
+            shown=f"{first}–{first + len(found) - 1}", total=total
         )
-    builder.adjust(1)
-    return builder.as_markup()
+    return text, search_results_keyboard(found, page=page, total_pages=total_pages)
 
 
 # --- adjusting and committing a set --------------------------------------
