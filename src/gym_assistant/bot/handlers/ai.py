@@ -22,7 +22,7 @@ from gym_assistant.ai.client import (
 )
 from gym_assistant.ai.conversation import ConversationService
 from gym_assistant.ai.tools import ToolContext
-from gym_assistant.ai.usage import UsageService
+from gym_assistant.ai.usage import UsageService, price_for
 from gym_assistant.bot.filters import RequireRole
 from gym_assistant.bot.texts import ru
 from gym_assistant.config import Settings
@@ -70,14 +70,21 @@ async def cmd_reset(message: Message, session: AsyncSession, user: User) -> None
 async def cmd_usage(
     message: Message, session: AsyncSession, user: User, settings: Settings
 ) -> None:
-    usage = UsageService(session)
-    mine = await usage.spent_this_month(user.id)
-    everyone = await usage.spent_this_month_total()
+    """What THIS person has spent, and on which model.
+
+    Deliberately not the total across everyone: how much someone else asks
+    the assistant is not a subscriber's business. The whole picture lives in
+    /ai_costs, behind the admin filter.
+    """
+    mine = await UsageService(session).spent_this_month(user.id)
+    model = settings.ai_model_main
+    price = price_for(model)
     await message.answer(
         ru.AI_USAGE_REPORT.format(
             mine=f"{mine:.2f}",
-            everyone=f"{everyone:.2f}",
-            limit=f"{settings.ai_monthly_limit_usd:.2f}",
+            model=model,
+            price_in=f"{price.input:g}",
+            price_out=f"{price.output:g}",
         )
     )
 

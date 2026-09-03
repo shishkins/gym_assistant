@@ -21,7 +21,7 @@ from gym_assistant.ai.client import (
     BudgetExceededError,
 )
 from gym_assistant.ai.conversation import ConversationService
-from gym_assistant.ai.usage import Tokens
+from gym_assistant.ai.usage import Tokens, UsageService
 from gym_assistant.bot.handlers import ai as ai_handlers
 from gym_assistant.config import Settings
 from gym_assistant.domain.models import Role
@@ -252,3 +252,67 @@ async def test_a_real_failure_is_not_dressed_up_as_overload(
     await bot.send("/ask как растёт жим")
 
     assert "перегружен" not in bot.session.last_text.lower()
+
+
+# --- whose spending is whose ----------------------------------------------
+#
+# Reported by a second pair of eyes: /ai_usage showed the total across
+# everyone. How much someone else asks the assistant is not a subscriber's
+# business - that view belongs to the owner.
+
+
+async def test_ai_usage_shows_only_your_own_spending(
+    bot: BotHarness, session: AsyncSession, stub: StubAssistant
+) -> None:
+    await _subscribe(session)
+    other = await ProfileService(session).get_or_create_user(4242, username="friend")
+    await UsageService(session).record(
+        user_id=other.id, session_id=None, model="claude-opus-5",
+        tokens=Tokens(input=1_000_000, output=1_000_000),
+    )
+
+    await bot.send("/ai_usage")
+
+    reply = bot.session.last_text
+    assert "30.00" not in reply, "чужие расходы попали в личный отчёт"
+    assert "0.00" in reply
+
+
+async def test_ai_usage_names_the_current_model(
+    bot: BotHarness, session: AsyncSession, stub: StubAssistant
+) -> None:
+    """Switching the model is an .env edit and a restart, so the bot has to
+    say which one is actually running."""
+    await _subscribe(session)
+
+    await bot.send("/ai_usage")
+
+    assert "claude-opus-5" in bot.session.last_text
+
+
+async def test_the_whole_bill_is_admin_only(
+    bot: BotHarness, session: AsyncSession, stub: StubAssistant
+) -> None:
+    await _subscribe(session)
+
+    await bot.send("/ai_costs")
+
+    assert "По людям" not in bot.session.last_text
+
+
+async def test_an_admin_sees_the_whole_bill(
+    admin_bot: BotHarness, session: AsyncSession
+) -> None:
+    other = await ProfileService(session).get_or_create_user(4242, username="friend")
+    await UsageService(session).record(
+        user_id=other.id, session_id=None, model="claude-opus-5",
+        tokens=Tokens(input=1_000_000),
+    )
+
+    admin_bot.session.clear()
+    await admin_bot.send("/ai_costs")
+
+    reply = admin_bot.session.last_text
+    assert "friend" in reply
+    assert "5.00" in reply
+    assert "claude-opus-5" in reply

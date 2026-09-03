@@ -16,8 +16,10 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant.ai.usage import UsageService
 from gym_assistant.bot.filters import IsAdmin
 from gym_assistant.bot.texts import render, ru
+from gym_assistant.config import Settings
 from gym_assistant.domain.models import Role, User
 from gym_assistant.domain.services import Access, AccessService, resolve
 
@@ -155,6 +157,35 @@ async def cmd_users(message: Message, session: AsyncSession) -> None:
             )
         )
     await message.answer(ru.ADMIN_USERS_HEADER.format(count=len(rows)) + "\n".join(lines))
+
+
+@router.message(Command("ai_costs"))
+async def cmd_ai_costs(message: Message, session: AsyncSession, settings: Settings) -> None:
+    """The whole AI bill: total, limit, and who spent it.
+
+    Lives here rather than in /ai_usage because it names other people's
+    spending, and that is an owner's view, not a subscriber's.
+    """
+    usage = UsageService(session)
+    total = await usage.spent_this_month_total()
+    rows = await usage.by_user_this_month()
+
+    lines = [
+        ru.ADMIN_AI_COST_LINE.format(
+            who=_who(target),
+            cost=f"{cost:.2f}",
+            calls=calls,
+        )
+        for target, cost, calls in rows
+    ]
+    await message.answer(
+        ru.ADMIN_AI_COSTS.format(
+            total=f"{total:.2f}",
+            limit=f"{settings.ai_monthly_limit_usd:.2f}",
+            model=settings.ai_model_main,
+            people="\n".join(lines) if lines else ru.ADMIN_AI_COSTS_NOBODY,
+        )
+    )
 
 
 def _who(target: User) -> str:

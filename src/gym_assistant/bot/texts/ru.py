@@ -565,7 +565,7 @@ AI_USAGE = (
     "<code>/ask что у меня недорабатывается</code>\n"
     "<code>/ask я застрял в приседе?</code>\n\n"
     "<code>/ai_reset</code> — начать разговор заново\n"
-    "<code>/ai_usage</code> — сколько потрачено за месяц"
+    "<code>/ai_usage</code> — сколько потратил ты и на какой модели"
 )
 
 AI_NOT_CONFIGURED = (
@@ -587,7 +587,17 @@ AI_RESET = "Разговор начат заново — прошлый конт
 AI_RESET_EMPTY = "Активного разговора и не было."
 
 AI_USAGE_REPORT = (
-    "💸 <b>Расходы на ассистента в этом месяце</b>\n\n"
-    "Ты: <b>${mine}</b>\n"
-    "Все вместе: <b>${everyone}</b> из ${limit}"
+    "💸 <b>Твои расходы на ассистента в этом месяце</b>\n\n"
+    "Потрачено: <b>${mine}</b>\n\n"
+    "Модель: <code>{model}</code>\n"
+    "<i>${price_in} за миллион входящих токенов, ${price_out} за миллион исходящих</i>"
 )
+
+ADMIN_AI_COSTS = (
+    "💸 <b>Расходы на ассистента в этом месяце</b>\n\n"
+    "Всего: <b>${total}</b> из ${limit}\n"
+    "Модель: <code>{model}</code>\n\n"
+    "<b>По людям</b>\n{people}"
+)
+ADMIN_AI_COST_LINE = "{who} — ${cost} · {calls} вызовов"
+ADMIN_AI_COSTS_NOBODY = "Ассистентом ещё никто не пользовался."

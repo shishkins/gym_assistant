@@ -16,7 +16,7 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from gym_assistant.domain.models import AiUsage
+from gym_assistant.domain.models import AiUsage, User
 
 log = structlog.get_logger(__name__)
 
@@ -142,6 +142,20 @@ class UsageService:
             )
         )
         return Decimal(total or 0)
+
+    async def by_user_this_month(
+        self, *, now: datetime | None = None
+    ) -> list[tuple[User, Decimal, int]]:
+        """Who spent what, dearest first. Admin-only: one person's spending
+        is not another's business."""
+        rows = await self._session.execute(
+            select(User, func.sum(AiUsage.cost_usd), func.count())
+            .join(AiUsage, AiUsage.user_id == User.id)
+            .where(AiUsage.created_at >= month_start(now))
+            .group_by(User.id)
+            .order_by(func.sum(AiUsage.cost_usd).desc())
+        )
+        return [(user, Decimal(cost or 0), calls) for user, cost, calls in rows]
 
     async def budget_left(self, limit_usd: float, *, now: datetime | None = None) -> Decimal:
         """How much of this month's budget is unspent, across all users.
