@@ -138,9 +138,57 @@ async def test_trimming_never_leaves_a_tool_use_without_its_result(
     assert isinstance(first["content"], str), "история начинается с результата инструмента"
 
 
-async def test_old_tool_results_lose_their_payload(session: AsyncSession) -> None:
-    """Raw tool JSON is the bulkiest thing in a conversation and the first
-    thing worth dropping: the numbers are already in the answer below it."""
+# --- prefix stability -----------------------------------------------------
+#
+# The property the cache actually depends on, and the one an "optimisation"
+# broke: eliding old tool results moved a boundary every turn, so every turn
+# changed bytes the model had already been sent. Cache writes became 62% of
+# the bill and the reads they were for never happened.
+
+
+async def test_earlier_turns_do_not_change_as_the_conversation_grows(
+    session: AsyncSession,
+) -> None:
+    """The cache matches by exact bytes: whatever was sent last turn must
+    come back identical this turn, or the whole prefix is rewritten at
+    1.25x the price of sending it fresh."""
+    user_id = await _user_id(session)
+    service = ConversationService(session)
+    talk = await service.active(user_id)
+
+    for index in range(4):
+        await service.append(talk.id, [_question(f"вопрос {index}"), *_tool_call()])
+    before = await service.history(talk.id)
+
+    await service.append(talk.id, [_question("новый вопрос"), *_tool_call()])
+    after = await service.history(talk.id)
+
+    assert after[: len(before)] == before, "старые ходы изменились — кэш промахнётся"
+
+
+async def test_a_normal_conversation_never_reaches_the_trim(
+    session: AsyncSession,
+) -> None:
+    """Trimming also moves the prefix, so it has to stay rare.
+
+    Ten questions with a tool call each is a long session by any measure,
+    and it must still replay whole - otherwise every question past the
+    threshold pays to rewrite the cache.
+    """
+    user_id = await _user_id(session)
+    service = ConversationService(session)
+    talk = await service.active(user_id)
+
+    for index in range(10):
+        await service.append(talk.id, [_question(f"вопрос {index}"), *_tool_call()])
+
+    history = await service.history(talk.id)
+    assert history[0]["content"] == "вопрос 0", "обрезка сработала на обычном разговоре"
+
+
+async def test_tool_results_keep_their_payload(session: AsyncSession) -> None:
+    """They are what the model is answering from, and with caching in place
+    they cost a tenth to resend."""
     user_id = await _user_id(session)
     service = ConversationService(session)
     talk = await service.active(user_id)
@@ -157,24 +205,10 @@ async def test_old_tool_results_lose_their_payload(session: AsyncSession) -> Non
         if isinstance(block, dict) and block.get("type") == "tool_result"
     ]
 
-    assert payloads, "в истории нет результатов инструментов — тест бесполезен"
-    assert any("опущены" in text for text in payloads), "старые результаты не урезаны"
+    assert payloads and all(text == "{}" for text in payloads)
 
 
-async def test_recent_tool_results_are_kept_intact(session: AsyncSession) -> None:
-    """The model still needs the numbers it is answering about right now."""
-    user_id = await _user_id(session)
-    service = ConversationService(session)
-    talk = await service.active(user_id)
-
-    await service.append(talk.id, [_question("вопрос"), *_tool_call()])
-
-    history = await service.history(talk.id)
-    last = history[-1]["content"][0]
-    assert last["content"] == "{}", "свежий результат урезали"
-
-
-async def test_elision_never_drops_a_tool_result_block(session: AsyncSession) -> None:
+async def test_every_tool_use_still_has_its_result(session: AsyncSession) -> None:
     """A tool_use whose result vanished makes the whole request invalid."""
     user_id = await _user_id(session)
     service = ConversationService(session)
@@ -184,19 +218,12 @@ async def test_elision_never_drops_a_tool_result_block(session: AsyncSession) ->
         await service.append(talk.id, [_question(f"вопрос {index}"), *_tool_call()])
 
     history = await service.history(talk.id)
-    uses = sum(
-        1
-        for turn in history
-        if isinstance(turn["content"], list)
-        for block in turn["content"]
-        if isinstance(block, dict) and block.get("type") == "tool_use"
-    )
-    results = sum(
-        1
-        for turn in history
-        if isinstance(turn["content"], list)
-        for block in turn["content"]
-        if isinstance(block, dict) and block.get("type") == "tool_result"
-    )
+    counted = {"tool_use": 0, "tool_result": 0}
+    for turn in history:
+        if not isinstance(turn["content"], list):
+            continue
+        for block in turn["content"]:
+            if isinstance(block, dict) and block.get("type") in counted:
+                counted[block["type"]] += 1
 
-    assert uses == results, f"{uses} вызовов против {results} результатов"
+    assert counted["tool_use"] == counted["tool_result"]

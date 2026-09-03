@@ -23,16 +23,30 @@ log = structlog.get_logger(__name__)
 # starts fresh instead of dragging yesterday's context - and its cost - along.
 IDLE_HOURS = 6
 
-# Turns kept when replaying history. Each one is resent on every request,
-# so this is a direct multiplier on the bill.
-MAX_TURNS = 12
+# Turns kept when replaying history.
+#
+# Raised from 12 once caching worked. The arithmetic inverted: resending
+# an old turn from cache costs a tenth of fresh input, while dropping one
+# moves the prefix and forces the whole conversation to be written again
+# at 1.25x. At 12 this fired after about the fourth question - routinely,
+# and expensively. It is a safety net against a conversation that never
+# ends, not a running economy: the six-hour idle timeout and /ai_reset
+# are what normally bound a discussion.
+MAX_TURNS = 40
 
-# Tool results are the bulkiest thing in a conversation - raw JSON of
-# every weigh-in and every set. Past this many turns back, the numbers
-# have already been said out loud in the answer, and carrying the source
-# rows along buys nothing but input tokens.
-KEEP_TOOL_RESULTS_FOR = 4
-ELIDED = '{"note": "результаты этого вызова опущены, см. ответ выше"}'
+# History is replayed byte-for-byte on every request, and the cache is
+# matched by exact bytes. So whatever this returns for a conversation must
+# not change as that conversation grows - the earlier turns have to look
+# identical next time, or the cached prefix misses and gets rewritten at
+# 1.25x the price of sending it fresh.
+#
+# An earlier version stripped the payload out of tool results older than
+# four turns, to save input tokens. Measured, it did the opposite: the
+# boundary moved every turn, so every turn changed bytes the model had
+# already been sent, and cache writes grew to 62% of the bill while the
+# reads they were supposed to enable never happened. With caching in
+# place, old content already costs a tenth - there was nothing left to
+# save and a prefix to lose.
 
 
 class ConversationService:
@@ -77,7 +91,7 @@ class ConversationService:
         cut = len(turns) - MAX_TURNS
         while cut < len(turns) and not _is_plain_user_turn(turns[cut]):
             cut += 1
-        return _elide_old_tool_results(turns[cut:])
+        return turns[cut:]
 
     async def append(self, session_id: int, turns: list[dict[str, Any]]) -> None:
         for turn in turns:
@@ -100,33 +114,6 @@ class ConversationService:
         )
         await self._session.flush()
         return result.first() is not None
-
-
-def _elide_old_tool_results(turns: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Strips the payload out of tool results the conversation has moved past.
-
-    The blocks stay - dropping a tool_result whose tool_use is still there
-    makes the request invalid - but their content shrinks to a note. What the
-    numbers meant is already in the assistant's answer right below them.
-    """
-    keep_from = max(0, len(turns) - KEEP_TOOL_RESULTS_FOR)
-    trimmed: list[dict[str, Any]] = []
-
-    for index, turn in enumerate(turns):
-        content = turn.get("content")
-        if index >= keep_from or not isinstance(content, list):
-            trimmed.append(turn)
-            continue
-
-        blocks = []
-        for block in content:
-            if isinstance(block, dict) and block.get("type") == "tool_result":
-                blocks.append({**block, "content": ELIDED})
-            else:
-                blocks.append(block)
-        trimmed.append({**turn, "content": blocks})
-
-    return trimmed
 
 
 def _is_plain_user_turn(turn: dict[str, Any]) -> bool:
