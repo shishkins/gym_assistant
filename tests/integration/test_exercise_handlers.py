@@ -21,6 +21,19 @@ async def bot(session: AsyncSession) -> BotHarness:
     return build_harness(session, settings)
 
 
+def _exercise_names(bot: BotHarness) -> set[str]:
+    """Buttons on the current keyboard that are exercises, not navigation."""
+    markup = bot.session.last_markup
+    assert markup is not None
+    chrome = {"⬅️ Назад", "‹", "›", " "}
+    return {
+        button.text
+        for row in markup.inline_keyboard
+        for button in row
+        if button.text not in chrome and "/" not in button.text
+    }
+
+
 async def test_menu_opens(bot: BotHarness) -> None:
     await bot.send("/exercises")
 
@@ -203,22 +216,26 @@ async def test_exit_search_button_returns_to_the_menu(bot: BotHarness) -> None:
 
 
 async def test_group_listing_is_paged(bot: BotHarness) -> None:
-    """Seeded groups fit one page, so the test creates enough to overflow."""
-    for index in range(3):
-        await bot.send("/exercises")
-        await bot.tap_button("Добавить своё")
-        await bot.send(f"Своя тяга номер {index}")
-        await bot.tap_button("Спина")
-        await bot.tap_button("Штанга")
-        await bot.tap_button("Вес")
+    """The catalogue now overflows a page on its own.
 
+    This used to create three personal exercises first, because every seeded
+    group fitted on one page - which is exactly why the user could never see
+    the paging and reported it as missing.
+    """
     await bot.send("/exercises")
     await bot.tap_button("По группам")
     await bot.tap_button("Спина")
 
-    assert bot.session.button_with("1/2"), "page indicator missing"
+    assert bot.session.button_with("1/"), "нет счётчика страниц"
+    first = _exercise_names(bot)
+
     await bot.tap_button("›")
-    assert bot.session.button_with("2/2")
+    second = _exercise_names(bot)
+
+    assert bot.session.button_with("2/")
+    # "What is new here" rather than "nothing repeats": the back button is
+    # deliberately on every page and would fail the stricter check.
+    assert second - first, "вторая страница не показала ничего нового"
 
 
 async def test_main_menu_reaches_every_feature(bot: BotHarness) -> None:

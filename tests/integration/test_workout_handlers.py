@@ -20,6 +20,19 @@ async def bot(session: AsyncSession) -> BotHarness:
     return build_harness(session, settings)
 
 
+def _exercise_names(bot: BotHarness) -> set[str]:
+    """Buttons on the current keyboard that are exercises, not navigation."""
+    markup = bot.session.last_markup
+    assert markup is not None
+    chrome = {"‹", "›", " "}
+    return {
+        button.text
+        for row in markup.inline_keyboard
+        for button in row
+        if button.text not in chrome and "/" not in button.text
+    }
+
+
 async def _sets(session: AsyncSession) -> list:
     user = await ProfileService(session).get_or_create_user(777)
     return await WorkoutService(session).current_sets(user.id)
@@ -404,10 +417,17 @@ async def test_catalogue_is_reachable_and_leads_back(bot: BotHarness) -> None:
 
 
 async def test_muscle_group_search_finds_the_right_muscle(bot: BotHarness) -> None:
-    """ "трицепс" used to return biceps work - one letter apart in trigrams."""
+    """ "трицепс" used to return biceps work - one letter apart in trigrams.
+
+    Asserts the muscle, not one exercise: with 15 triceps movements in the
+    catalogue, which of them lands on the first page is a ranking decision
+    and will keep changing.
+    """
     await bot.send("/exercises трицепс")
 
-    assert bot.session.button_with("Разгибание рук на блоке")
+    names = " ".join(_exercise_names(bot))
+    assert "Жим узким хватом" in names, f"нет базового трицепсового: {names}"
+    assert "Молотки" not in names, "снова вернулся бицепс"
 
 
 async def test_cardio_is_in_the_catalogue(bot: BotHarness) -> None:

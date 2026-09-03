@@ -287,7 +287,8 @@ exercises:
 
   - slug: dumbbell_shoulder_press
     name_ru: Жим гантелей сидя
-    aliases: [жим гантелей сидя, жим на плечи, дб жим плечи]
+    aliases: [жим гантелей сидя, жим на плечи, дб жим плечи, жим сидя гантели,
+              жим гантелей над головой сидя]
     primary: shoulders
     secondary: [triceps]
     equipment: dumbbell
@@ -784,3 +785,1842 @@ exercises:
       Прыжки низкие, вращение кистями, а не всей рукой.
     mistakes: |
       Высокие прыжки и вращение от плеча — быстро выматывает без пользы.
+
+  # =====================================================================
+  # Расширение справочника. Всё, что ниже, добавлено миграцией 0007.
+  # =====================================================================
+
+  # ---------------------------------------------------------------- Грудь
+
+  - slug: decline_bench_press
+    name_ru: Жим штанги на наклонной вниз
+    aliases: [жим вниз головой, деклайн, жим на отрицательном наклоне, decline]
+    primary: chest
+    secondary: [triceps]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Угол 15–30° вниз. Гриф идёт к нижней части груди. Ноги надёжно
+      зафиксированы: с отрицательного наклона легко сползти.
+    mistakes: |
+      Слишком крутой наклон, из-за которого кровь приливает к голове,
+      и работа без страхующего — снять штангу отсюда тяжело.
+
+  - slug: incline_dumbbell_press
+    name_ru: Жим гантелей на наклонной
+    aliases: [жим гантелей вверх, наклонный жим гантелями, инклайн гантели]
+    primary: chest
+    secondary: [shoulders, triceps]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Угол 30°: выше — и нагрузка уходит в передний пучок дельт.
+      В нижней точке гантели на уровне груди, локти чуть ниже плеч.
+    mistakes: |
+      Угол 45° и выше, стук гантелей друг о друга наверху, потеря
+      контроля в негативной фазе.
+
+  - slug: incline_dumbbell_fly
+    name_ru: Разведение гантелей на наклонной
+    aliases: [разводка на наклонной, разведения наклонные, наклонная разводка]
+    primary: chest
+    secondary: [shoulders]
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Локти слегка согнуты и зафиксированы в этом угле на весь подход.
+      Движение идёт по дуге, а не по прямой.
+    mistakes: |
+      Превращение разводки в жим за счёт сгибания локтей, слишком
+      глубокое опускание с риском для плеча.
+
+  - slug: machine_chest_press
+    name_ru: Жим в тренажёре на грудь
+    aliases: [жим в хаммере, хаммер грудь, жим сидя тренажёр, машина на грудь]
+    primary: chest
+    secondary: [triceps, shoulders]
+    equipment: machine
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Отрегулируйте сиденье так, чтобы рукояти были на уровне середины
+      груди. Лопатки прижаты к спинке.
+    mistakes: |
+      Слишком высокое сиденье, из-за которого работают плечи,
+      и полное выпрямление локтей с щелчком.
+
+  - slug: pec_deck
+    name_ru: Сведение рук в тренажёре
+    aliases: [бабочка, пек-дек, сведения в тренажёре, butterfly, peck deck]
+    primary: chest
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Локти на уровне плеч, спина прижата. Секунда паузы в точке
+      сведения даёт больше, чем лишние пять килограммов.
+    mistakes: |
+      Работа рывками и слишком большая амплитуда назад, которая
+      выкручивает плечевой сустав.
+
+  - slug: cable_fly_low
+    name_ru: Сведение в кроссовере снизу
+    aliases: [кроссовер снизу, сведения снизу, разводка в блоке снизу]
+    primary: chest
+    secondary: [shoulders]
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Руки идут снизу вверх и внутрь, к уровню ключиц. Акцент на
+      верхнюю часть груди.
+    mistakes: |
+      Слишком большой вес, из-за которого корпус раскачивается,
+      и сведение перед животом вместо груди.
+
+  - slug: cable_fly_high
+    name_ru: Сведение в кроссовере сверху
+    aliases: [кроссовер сверху, сведения сверху, разводка в блоке сверху]
+    primary: chest
+    secondary: []
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Лёгкий наклон корпуса вперёд, руки сводятся на уровне низа
+      груди. Работает нижняя и средняя часть.
+    mistakes: |
+      Сведение слишком высоко и помощь корпусом на последних
+      повторениях.
+
+  - slug: dumbbell_pullover
+    name_ru: Пуловер с гантелью
+    aliases: [пуловер, пулловер, пуловер с гантелей]
+    primary: chest
+    secondary: [back, triceps]
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Гантель заводится за голову по дуге, руки почти прямые.
+      Опускать до комфортного растяжения, не глубже.
+    mistakes: |
+      Прогиб в пояснице и опускание до боли в плечах ради лишних
+      сантиметров амплитуды.
+
+  - slug: floor_press
+    name_ru: Жим лёжа с пола
+    aliases: [жим с пола, floor press]
+    primary: chest
+    secondary: [triceps]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Пол ограничивает амплитуду и снимает нагрузку с плеч — хороший
+      вариант, когда плечо беспокоит.
+    mistakes: |
+      Отбив локтями от пола вместо контролируемой паузы.
+
+  - slug: svend_press
+    name_ru: Жим блинов перед собой
+    aliases: [жим свенда, свенд, жим блина]
+    primary: chest
+    secondary: [shoulders]
+    equipment: other
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Блины сжимаются ладонями и выжимаются вперёд. Нагрузка идёт
+      от постоянного сведения, а не от веса.
+    mistakes: |
+      Расслабление рук в крайней точке — весь смысл упражнения в том,
+      чтобы не переставать сжимать.
+
+  - slug: incline_push_up
+    name_ru: Отжимания с возвышения
+    aliases: [отжимания с колен от опоры, лёгкие отжимания, отжимания с упора]
+    primary: chest
+    secondary: [triceps, shoulders]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Чем выше опора, тем легче. Удобный способ набрать объём,
+      когда обычные отжимания уже не даются в нужном количестве.
+    mistakes: |
+      Провал таза и опускание не до касания грудью опоры.
+
+  - slug: decline_push_up
+    name_ru: Отжимания с ногами на возвышении
+    aliases: [отжимания ноги на скамье, тяжёлые отжимания]
+    primary: chest
+    secondary: [shoulders, triceps]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Ноги на скамье смещают акцент на верх груди и передние дельты.
+      Корпус остаётся прямой линией.
+    mistakes: |
+      Прогиб в пояснице и задранный таз.
+
+  # ---------------------------------------------------------------- Спина
+
+  - slug: t_bar_row
+    name_ru: Тяга Т-грифа
+    aliases: [т-гриф, тибар, тяга т грифа, t-bar]
+    primary: back
+    secondary: [biceps]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Спина прямая, наклон около 45°. Гриф тянется к низу живота,
+      лопатки сводятся в верхней точке.
+    mistakes: |
+      Круглая поясница и рывки корпусом — верный способ снять
+      нагрузку со спины и переложить её на позвоночник.
+
+  - slug: chest_supported_row
+    name_ru: Тяга с упором в грудь
+    aliases: [тяга лёжа на скамье, тяга с упором, seal row]
+    primary: back
+    secondary: [biceps]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Упор в скамью исключает читинг корпусом — остаётся только
+      работа мышц спины.
+    mistakes: |
+      Отрыв груди от скамьи ради лишнего повторения.
+
+  - slug: pendlay_row
+    name_ru: Тяга Пендлея
+    aliases: [пендлей, тяга с пола, pendlay row]
+    primary: back
+    secondary: [biceps]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Каждое повторение начинается с пола, корпус параллелен полу.
+      Мощная тяга к низу груди.
+    mistakes: |
+      Подъём корпуса во время тяги — тогда это уже обычная тяга
+      в наклоне, а не Пендлей.
+
+  - slug: chin_up
+    name_ru: Подтягивания обратным хватом
+    aliases: [подтягивания к себе, обратный хват, подтягивания на бицепс]
+    primary: back
+    secondary: [biceps]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Ладони к себе, хват на ширине плеч. Бицепс включается сильнее,
+      поэтому обычно даётся легче обычных подтягиваний.
+    mistakes: |
+      Раскачка корпусом и неполное разгибание рук внизу.
+
+  - slug: wide_grip_pull_up
+    name_ru: Подтягивания широким хватом
+    aliases: [широкий хват подтягивания, подтягивания на ширину]
+    primary: back
+    secondary: [biceps]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Тянуться грудью к перекладине, а не подбородком. Локти идут
+      вниз и назад.
+    mistakes: |
+      Слишком широкий хват, сокращающий амплитуду почти до нуля.
+
+  - slug: neutral_grip_pulldown
+    name_ru: Тяга верхнего блока параллельным хватом
+    aliases: [тяга блока узким хватом, параллельный хват тяга, узкая тяга сверху]
+    primary: back
+    secondary: [biceps]
+    equipment: cable
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Параллельный хват мягче к плечам и локтям. Тянуть к верху
+      груди, слегка отклонив корпус.
+    mistakes: |
+      Тяга за голову и отклонение корпуса до положения лёжа.
+
+  - slug: straight_arm_pulldown
+    name_ru: Пуловер на блоке
+    aliases: [тяга прямыми руками, пуловер в блоке, straight arm]
+    primary: back
+    secondary: [core]
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Руки почти прямые, движение только в плечевом суставе.
+      Одно из немногих изолирующих упражнений на широчайшие.
+    mistakes: |
+      Сгибание локтей — тогда это превращается в разгибание
+      на трицепс.
+
+  - slug: one_arm_cable_row
+    name_ru: Тяга блока одной рукой
+    aliases: [тяга одной рукой в блоке, односторонняя тяга блока]
+    primary: back
+    secondary: [biceps]
+    equipment: cable
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Одностороннее движение выравнивает отставание одной стороны.
+      Позвольте лопатке уйти вперёд в растяжении.
+    mistakes: |
+      Разворот корпуса вслед за рукой вместо работы спиной.
+
+  - slug: machine_row
+    name_ru: Тяга в тренажёре сидя
+    aliases: [тяга в хаммере, хаммер спина, машина на спину, рычажная тяга]
+    primary: back
+    secondary: [biceps]
+    equipment: machine
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Грудь прижата к упору, тянуть локтями назад. Хорошо подходит,
+      когда поясница устала от свободных весов.
+    mistakes: |
+      Отрыв корпуса от упора и работа только руками.
+
+  - slug: rack_pull
+    name_ru: Тяга с плинтов
+    aliases: [тяга из стоек, рэк пул, rack pull, частичная становая]
+    primary: back
+    secondary: [glutes, hamstrings]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Штанга стартует с уровня колен. Позволяет работать с весом
+      больше станового, нагружая верх спины.
+    mistakes: |
+      Округление грудного отдела под большим весом и отбив штанги
+      от упоров.
+
+  - slug: sumo_deadlift
+    name_ru: Становая тяга сумо
+    aliases: [сумо, становая сумо, тяга сумо]
+    primary: back
+    secondary: [quads, glutes, hamstrings]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Широкая постановка ног, руки внутри. Колени разводятся
+      в стороны, корпус более вертикальный, чем в классике.
+    mistakes: |
+      Подъём таза раньше плеч и сведение коленей внутрь.
+
+  - slug: good_morning
+    name_ru: Наклоны со штангой
+    aliases: [гуд монинг, доброе утро, good morning, наклоны с грифом]
+    primary: back
+    secondary: [hamstrings, glutes]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Начинайте с пустого грифа. Движение идёт от таза назад,
+      спина остаётся прямой.
+    mistakes: |
+      Слишком большой вес на старте — упражнение выглядит проще,
+      чем есть, и не прощает округлённой поясницы.
+
+  - slug: face_pull
+    name_ru: Тяга каната к лицу
+    aliases: [фейс пул, тяга к лицу, face pull]
+    primary: back
+    secondary: [shoulders]
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Канат тянется к переносице, локти выше кистей. Лучшее, что
+      можно сделать для здоровья плеч и осанки.
+    mistakes: |
+      Слишком большой вес, при котором движение превращается
+      в обычную тягу к груди.
+
+  - slug: inverted_row
+    name_ru: Австралийские подтягивания
+    aliases: [горизонтальные подтягивания, тяга в гравитроне, австралийские]
+    primary: back
+    secondary: [biceps]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Чем горизонтальнее корпус, тем тяжелее. Хорошая ступень
+      к обычным подтягиваниям.
+    mistakes: |
+      Провисание таза и неполное касание грудью грифа.
+
+  - slug: single_arm_dumbbell_row_bench
+    name_ru: Тяга гантели в упоре на скамью
+    aliases: [тяга гантели одной рукой, тяга в упоре, тяга с упором в скамью]
+    primary: back
+    secondary: [biceps]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Опора коленом и рукой, спина параллельна полу. Тянуть локтем
+      к карману, а не в сторону.
+    mistakes: |
+      Разворот корпуса и рывок поясницей в верхней точке.
+
+  - slug: hyperextension_reverse
+    name_ru: Обратная гиперэкстензия
+    aliases: [обратные гиперэкстензии, reverse hyper]
+    primary: back
+    secondary: [glutes, hamstrings]
+    equipment: machine
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Корпус зафиксирован, работают ноги. Мягкая нагрузка
+      на поясницу и ягодицы.
+    mistakes: |
+      Заброс ног по инерции и переразгибание в пояснице.
+
+  - slug: kettlebell_swing
+    name_ru: Махи гирей
+    aliases: [свинги, махи с гирей, kettlebell swing, качели]
+    primary: back
+    secondary: [glutes, hamstrings, core]
+    equipment: kettlebell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Движение от таза, а не от рук: гиря взлетает за счёт резкого
+      выпрямления бёдер. Руки только держат.
+    mistakes: |
+      Приседание вместо наклона и подъём гири руками — тогда
+      это упражнение на плечи и больную поясницу.
+
+  # ---------------------------------------------------------------- Плечи
+
+  - slug: arnold_press
+    name_ru: Жим Арнольда
+    aliases: [арнольд, арнольда жим, arnold press]
+    primary: shoulders
+    secondary: [triceps]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Разворот кистей по ходу движения включает все три пучка дельт.
+      Вес заметно меньше обычного жима — это нормально.
+    mistakes: |
+      Слишком быстрый темп, при котором разворот теряется,
+      и прогиб в пояснице.
+
+  - slug: machine_shoulder_press
+    name_ru: Жим на плечи в тренажёре
+    aliases: [жим плечи хаммер, машина на плечи, жим в тренажёре над головой]
+    primary: shoulders
+    secondary: [triceps]
+    equipment: machine
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Хороший вариант для последних подходов, когда стабилизаторы
+      уже устали, а дельты ещё нет.
+    mistakes: |
+      Слишком низкое сиденье и полное выпрямление локтей.
+
+  - slug: cable_lateral_raise
+    name_ru: Махи в стороны на блоке
+    aliases: [махи в блоке, разведение в кроссовере, боковые в блоке]
+    primary: shoulders
+    secondary: []
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Блок даёт нагрузку в нижней точке, где гантели её теряют.
+      Работать одной рукой, корпус неподвижен.
+    mistakes: |
+      Раскачка корпусом и подъём выше уровня плеча.
+
+  - slug: front_raise
+    name_ru: Подъём гантелей перед собой
+    aliases: [фронтальные махи, подъёмы перед собой, махи вперёд]
+    primary: shoulders
+    secondary: []
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      До уровня глаз, не выше. Передний пучок и так получает много
+      работы во всех жимах — здесь хватит небольшого веса.
+    mistakes: |
+      Заброс веса корпусом и подъём двумя руками разом
+      с раскачиванием.
+
+  - slug: reverse_pec_deck
+    name_ru: Обратная бабочка
+    aliases: [обратные сведения, задняя дельта в тренажёре, реверс пек-дек]
+    primary: shoulders
+    secondary: [back]
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Задняя дельта — самый отстающий пучок у большинства.
+      Локти слегка согнуты, движение строго в стороны.
+    mistakes: |
+      Сведение лопаток вместо работы дельтой и слишком большой вес.
+
+  - slug: cable_rear_delt_fly
+    name_ru: Разведение в кроссовере на заднюю дельту
+    aliases: [задняя дельта в блоке, кроссовер на заднюю дельту]
+    primary: shoulders
+    secondary: [back]
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Руки перекрещены, тросы идут крест-накрест. Разводить
+      до линии плеч.
+    mistakes: |
+      Работа корпусом и сгибание локтей в процессе.
+
+  - slug: landmine_press
+    name_ru: Жим лендмайн
+    aliases: [лендмайн, жим грифа под углом, landmine press]
+    primary: shoulders
+    secondary: [chest, triceps]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Гриф упирается одним концом в угол, жим идёт по диагонали.
+      Мягкий для плеч вариант вертикального жима.
+    mistakes: |
+      Разворот корпуса и работа только рукой без включения корпуса.
+
+  - slug: push_press
+    name_ru: Швунг жимовой
+    aliases: [швунг, push press, жим с подсёдом]
+    primary: shoulders
+    secondary: [triceps, quads]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Короткий подсед ногами задаёт импульс, руки дожимают.
+      Позволяет работать с весом больше строгого жима.
+    mistakes: |
+      Глубокий присед вместо короткого подседа и прогиб в пояснице
+      при дожиме.
+
+  - slug: behind_neck_press
+    name_ru: Жим из-за головы
+    aliases: [жим за голову, армейский из-за головы]
+    primary: shoulders
+    secondary: [triceps]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Требует хорошей подвижности плеч. Если её нет — выбирайте
+      обычный жим стоя, ничего не потеряете.
+    mistakes: |
+      Опускание грифа ниже уровня ушей и работа с весом,
+      который вынуждает наклонять голову вперёд.
+
+  - slug: dumbbell_shrug
+    name_ru: Шраги с гантелями
+    aliases: [шраги гантели, пожимания плечами с гантелями]
+    primary: shoulders
+    secondary: [back]
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Движение строго вверх, пауза в верхней точке. Гантели
+      удобнее штанги: руки не упираются в бёдра.
+    mistakes: |
+      Вращение плечами по кругу — лишняя нагрузка на сустав
+      без пользы для трапеции.
+
+  - slug: cuban_rotation
+    name_ru: Кубинский жим
+    aliases: [кубинский поворот, ротация плеча, cuban press]
+    primary: shoulders
+    secondary: []
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Разминочное упражнение для вращательной манжеты. Вес
+      минимальный, движение медленное.
+    mistakes: |
+      Использование рабочего веса — здесь это прямой путь
+      к травме плеча.
+
+  - slug: pike_push_up
+    name_ru: Отжимания домиком
+    aliases: [отжимания уголком, пайк отжимания, pike push up]
+    primary: shoulders
+    secondary: [triceps]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Таз высоко, корпус домиком — вес переносится на плечи.
+      Ступень к отжиманиям в стойке на руках.
+    mistakes: |
+      Опускание к полу грудью вместо макушки — тогда это обычные
+      отжимания.
+
+  # --------------------------------------------------------------- Бицепс
+
+  - slug: preacher_curl
+    name_ru: Сгибания на скамье Скотта
+    aliases: [скотта, парта, сгибания на парте, preacher curl, скамья скотта]
+    primary: biceps
+    secondary: [forearms]
+    equipment: barbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Подмышки плотно в подушку, локти не отрываются. Внизу
+      разгибать почти полностью, но без рывка.
+    mistakes: |
+      Отрыв локтей и резкое бросание веса вниз — самый частый
+      способ потянуть бицепс именно здесь.
+
+  - slug: incline_dumbbell_curl
+    name_ru: Сгибания на наклонной скамье
+    aliases: [сгибания на наклонной, бицепс на наклонной, инклайн бицепс]
+    primary: biceps
+    secondary: []
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Наклон 45–60°, руки свободно висят. Растяжение в нижней точке
+      сильнее, чем в любом другом варианте.
+    mistakes: |
+      Вынос локтей вперёд, убивающий то самое растяжение,
+      ради которого упражнение и делается.
+
+  - slug: concentration_curl
+    name_ru: Концентрированные сгибания
+    aliases: [концентрированные, концентрация на бицепс, concentration curl]
+    primary: biceps
+    secondary: []
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Локоть упирается во внутреннюю часть бедра. Никакого читинга
+      физически не получится — в этом и смысл.
+    mistakes: |
+      Помощь свободной рукой и подъём за счёт наклона корпуса.
+
+  - slug: cable_curl
+    name_ru: Сгибания на нижнем блоке
+    aliases: [бицепс на блоке, сгибания в блоке, тяга на бицепс]
+    primary: biceps
+    secondary: [forearms]
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Блок держит нагрузку постоянной на всей амплитуде,
+      в отличие от гантелей.
+    mistakes: |
+      Отход назад от блока и раскачка корпусом.
+
+  - slug: reverse_curl
+    name_ru: Сгибания обратным хватом
+    aliases: [обратный хват на бицепс, реверс керл, обратные сгибания]
+    primary: biceps
+    secondary: [forearms]
+    equipment: barbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Хват сверху смещает нагрузку на брахиалис и предплечья.
+      Вес будет заметно меньше обычного подъёма.
+    mistakes: |
+      Попытка работать привычным весом и сгибание кистей.
+
+  - slug: spider_curl
+    name_ru: Сгибания лёжа на наклонной
+    aliases: [паучьи сгибания, спайдер керл, spider curl]
+    primary: biceps
+    secondary: []
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Грудью на наклонную скамью, руки висят вертикально вниз.
+      Пик нагрузки приходится на верхнюю точку.
+    mistakes: |
+      Отрыв груди от скамьи и раскачивание гантелей по инерции.
+
+  - slug: cable_hammer_curl
+    name_ru: Молот на блоке с канатом
+    aliases: [молотки на блоке, канат на бицепс, hammer cable]
+    primary: biceps
+    secondary: [forearms]
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Нейтральный хват каната нагружает брахиалис — мышцу, которая
+      выталкивает бицепс наружу и делает руку толще.
+    mistakes: |
+      Разведение концов каната в стороны вместо параллельного
+      движения.
+
+  - slug: machine_curl
+    name_ru: Сгибания в тренажёре
+    aliases: [бицепс в тренажёре, машина на бицепс]
+    primary: biceps
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Отрегулируйте сиденье так, чтобы локти совпали с осью вращения
+      тренажёра.
+    mistakes: |
+      Работа только верхней частью амплитуды из-за слишком
+      большого веса.
+
+  - slug: zottman_curl
+    name_ru: Сгибания Зоттмана
+    aliases: [зоттман, zottman curl]
+    primary: biceps
+    secondary: [forearms]
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Вверх обычным хватом, наверху разворот кистей, вниз —
+      обратным. Бицепс и предплечье в одном движении.
+    mistakes: |
+      Спешка на негативной фазе, ради которой упражнение
+      и придумано.
+
+  - slug: chin_up_weighted
+    name_ru: Подтягивания обратным хватом с весом
+    aliases: [подтягивания с отягощением на бицепс, с весом обратным хватом]
+    primary: biceps
+    secondary: [back]
+    equipment: bodyweight
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Самое тяжёлое, что можно дать бицепсу. Вес на поясе,
+      амплитуда полная.
+    mistakes: |
+      Рывки и сокращение амплитуды, как только появляется
+      дополнительный вес.
+
+  # -------------------------------------------------------------- Трицепс
+
+  - slug: dumbbell_kickback
+    name_ru: Разгибание руки в наклоне
+    aliases: [кикбэк, отведение руки назад, разгибание в наклоне, kickback]
+    primary: triceps
+    secondary: []
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Плечо параллельно полу и неподвижно, работает только
+      предплечье. Пауза в выпрямленном положении.
+    mistakes: |
+      Раскачивание плеча — тогда упражнение перестаёт нагружать
+      трицепс вовсе.
+
+  - slug: cable_overhead_extension
+    name_ru: Разгибание из-за головы на блоке
+    aliases: [французский на блоке, трицепс из-за головы блок, канат из-за головы]
+    primary: triceps
+    secondary: []
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Положение над головой растягивает длинную головку —
+      ту, что делает руку объёмнее сбоку.
+    mistakes: |
+      Движение локтями вперёд-назад вместо фиксации.
+
+  - slug: reverse_grip_pushdown
+    name_ru: Разгибание на блоке обратным хватом
+    aliases: [обратный хват трицепс, разгибания снизу хватом]
+    primary: triceps
+    secondary: []
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Обратный хват смещает акцент на медиальную головку.
+      Вес меньше обычного, кисть держать жёстко.
+    mistakes: |
+      Слишком большой вес, из-за которого кисть заламывается.
+
+  - slug: jm_press
+    name_ru: JM-жим
+    aliases: [джей эм жим, jm press, жим джей эм]
+    primary: triceps
+    secondary: [chest]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Нечто среднее между узким жимом и французским: гриф идёт
+      к подбородку по короткой дуге.
+    mistakes: |
+      Попытка сразу работать с весом узкого жима — локти
+      этого не любят.
+
+  - slug: diamond_push_up
+    name_ru: Отжимания узким хватом
+    aliases: [алмазные отжимания, отжимания домиком руками, diamond push up]
+    primary: triceps
+    secondary: [chest]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Ладони под грудью, большие пальцы и указательные образуют
+      ромб. Локти вдоль корпуса.
+    mistakes: |
+      Разведённые локти, из-за которых нагрузка уходит в грудь
+      и плечи.
+
+  - slug: machine_triceps_extension
+    name_ru: Разгибание на трицепс в тренажёре
+    aliases: [трицепс в тренажёре, машина на трицепс]
+    primary: triceps
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Удобно добивать трицепс в конце тренировки, когда держать
+      равновесие уже не хочется.
+    mistakes: |
+      Помощь корпусом и неполное разгибание.
+
+  - slug: dumbbell_skull_crusher
+    name_ru: Французский жим с гантелями
+    aliases: [французский гантели, черепушки с гантелями]
+    primary: triceps
+    secondary: []
+    equipment: dumbbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Нейтральный хват мягче для локтей, чем прямой гриф.
+      Опускать к ушам, а не ко лбу.
+    mistakes: |
+      Разведение локтей в стороны и слишком быстрый темп.
+
+  - slug: ring_dips
+    name_ru: Отжимания на кольцах
+    aliases: [кольца брусья, отжимания кольца, ring dips]
+    primary: triceps
+    secondary: [chest, shoulders]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Кольца требуют стабилизации — сложнее брусьев при том же
+      количестве повторений.
+    mistakes: |
+      Попытка сразу повторить свои цифры с брусьев.
+
+  - slug: bench_press_board
+    name_ru: Жим с доски
+    aliases: [борд пресс, board press, жим с борда]
+    primary: triceps
+    secondary: [chest]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Ограниченная амплитуда позволяет работать с весом больше
+      рабочего и прокачать верхнюю фазу жима.
+    mistakes: |
+      Отбив грифа от доски вместо паузы.
+
+  # ----------------------------------------------------------- Предплечья
+
+  - slug: wrist_curl
+    name_ru: Сгибания кистей
+    aliases: [кистевые сгибания, сгибание запястий, предплечья штанга]
+    primary: forearms
+    secondary: []
+    equipment: barbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Предплечья лежат на бёдрах или скамье, работают только кисти.
+      Амплитуда небольшая, повторений много.
+    mistakes: |
+      Подъём предплечий вместе с кистями и слишком большой вес.
+
+  - slug: reverse_wrist_curl
+    name_ru: Разгибания кистей
+    aliases: [обратные кистевые, разгибание запястий]
+    primary: forearms
+    secondary: []
+    equipment: barbell
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Обратная сторона предплечья, которую почти все игнорируют.
+      Помогает от боли в локте у тех, кто много тянет.
+    mistakes: |
+      Вес как в обычных сгибаниях — разгибатели заметно слабее.
+
+  - slug: plate_pinch
+    name_ru: Удержание блинов щипцом
+    aliases: [щипковый хват, удержание блинов, pinch grip]
+    primary: forearms
+    secondary: []
+    equipment: other
+    type: time
+    compound: false
+    video_url:
+    tips: |
+      Два блина гладкими сторонами наружу, держать пальцами.
+      Считается время, а не повторения.
+    mistakes: |
+      Подпирание блинов бедром и работа до полного отказа хвата
+      каждый подход.
+
+  - slug: dead_hang
+    name_ru: Вис на перекладине
+    aliases: [вис, висеть на турнике, dead hang]
+    primary: forearms
+    secondary: [back]
+    equipment: bodyweight
+    type: time
+    compound: false
+    video_url:
+    tips: |
+      Простейший способ растить хват и разгружать позвоночник.
+      Плечи не полностью расслаблены, лопатки чуть активны.
+    mistakes: |
+      Полное расслабление плечевого пояса под своим весом.
+
+  - slug: wrist_roller
+    name_ru: Скручивание на кистевом ролике
+    aliases: [ролик на предплечья, кистевой ролик, wrist roller]
+    primary: forearms
+    secondary: []
+    equipment: other
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Руки вытянуты вперёд, вес наматывается и разматывается.
+      Жжение появляется быстрее, чем ожидаешь.
+    mistakes: |
+      Опускание рук вниз, чтобы стало легче.
+
+  # ---------------------------------------------------------- Квадрицепс
+
+  - slug: hack_squat
+    name_ru: Гакк-приседания
+    aliases: [гакк, гак приседания, хак присед, hack squat]
+    primary: quads
+    secondary: [glutes]
+    equipment: machine
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Спина прижата к платформе, стопы чуть впереди. Позволяет
+      грузить квадрицепс, не нагружая поясницу.
+    mistakes: |
+      Отрыв поясницы от спинки внизу и сведение коленей.
+
+  - slug: goblet_squat
+    name_ru: Гоблет-приседания
+    aliases: [гоблет, приседания с гантелью у груди, goblet squat, кубковые]
+    primary: quads
+    secondary: [glutes, core]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Гантель или гиря у груди работает противовесом, помогая
+      держать корпус вертикально. Лучший вариант для новичка.
+    mistakes: |
+      Отрыв пяток и наклон корпуса вперёд под большим весом.
+
+  - slug: box_squat
+    name_ru: Приседания в короб
+    aliases: [приседания на ящик, бокс сквот, box squat, присед на скамью]
+    primary: quads
+    secondary: [glutes, hamstrings]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Короб задаёт одинаковую глубину каждое повторение. Садиться,
+      а не падать; пауза без расслабления спины.
+    mistakes: |
+      Отбив от короба и полное расслабление на нём под весом.
+
+  - slug: pause_squat
+    name_ru: Приседания с паузой
+    aliases: [присед с паузой, пауза в приседе, pause squat]
+    primary: quads
+    secondary: [glutes]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Две секунды в нижней точке без потери напряжения. Убирает
+      отбив и показывает реальную силу в яме.
+    mistakes: |
+      Расслабление корпуса во время паузы.
+
+  - slug: sissy_squat
+    name_ru: Сисси-приседания
+    aliases: [сисси присед, sissy squat, приседания на коленях]
+    primary: quads
+    secondary: []
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Колени уходят вперёд, корпус отклоняется назад одной линией
+      с бёдрами. Изоляция квадрицепса без веса.
+    mistakes: |
+      Сгибание в тазобедренном суставе, превращающее упражнение
+      в обычный присед.
+
+  - slug: step_up
+    name_ru: Зашагивания на возвышение
+    aliases: [зашагивания, степ ап, step up, подъёмы на platform]
+    primary: quads
+    secondary: [glutes]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Подъём за счёт рабочей ноги, вторая только касается опоры.
+      Высота опоры — до угла 90° в колене.
+    mistakes: |
+      Отталкивание нижней ногой и запрыгивание по инерции.
+
+  - slug: walking_lunges
+    name_ru: Выпады в движении
+    aliases: [ходячие выпады, выпады шагом, walking lunges]
+    primary: quads
+    secondary: [glutes, hamstrings]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Шаг достаточно длинный, колено задней ноги почти касается
+      пола. Корпус вертикально.
+    mistakes: |
+      Короткий шаг, при котором колено уходит далеко за носок,
+      и заваливание корпуса вперёд.
+
+  - slug: reverse_lunge
+    name_ru: Обратные выпады
+    aliases: [выпады назад, реверс выпады, reverse lunge]
+    primary: quads
+    secondary: [glutes]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Шаг назад мягче для коленей, чем вперёд. Опорная нога
+      остаётся на месте.
+    mistakes: |
+      Перенос веса на заднюю ногу вместо опоры на переднюю.
+
+  - slug: leg_press_narrow
+    name_ru: Жим ногами узкой постановкой
+    aliases: [жим ногами узко, узкая постановка жим ногами]
+    primary: quads
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Стопы вместе и ниже центра платформы — акцент на внешнюю
+      часть квадрицепса.
+    mistakes: |
+      Отрыв таза от спинки в нижней точке — прямая нагрузка
+      на поясницу.
+
+  - slug: front_rack_lunge
+    name_ru: Выпады со штангой на груди
+    aliases: [выпады фронт, фронтальные выпады со штангой]
+    primary: quads
+    secondary: [glutes, core]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Штанга на груди заставляет держать корпус вертикально —
+      нагрузка идёт точно в квадрицепс.
+    mistakes: |
+      Заваливание локтей вниз и потеря положения штанги.
+
+  - slug: wall_sit
+    name_ru: Присед у стены
+    aliases: [стульчик, у стенки присед, wall sit]
+    primary: quads
+    secondary: []
+    equipment: bodyweight
+    type: time
+    compound: false
+    video_url:
+    tips: |
+      Бёдра параллельно полу, спина прижата к стене. Считается
+      время удержания.
+    mistakes: |
+      Опора руками на бёдра и угол в колене больше 90°.
+
+  - slug: belt_squat
+    name_ru: Приседания с поясом
+    aliases: [белт сквот, присед с поясом, belt squat]
+    primary: quads
+    secondary: [glutes]
+    equipment: machine
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Вес висит на поясе, позвоночник не сжимается. Выход,
+      когда поясница травмирована.
+    mistakes: |
+      Наклон корпуса вперёд и слишком высокая постановка стоп.
+
+  # ------------------------------------------------------- Бицепс бедра
+
+  - slug: seated_leg_curl
+    name_ru: Сгибание ног сидя
+    aliases: [сгибания сидя, бицепс бедра сидя, seated leg curl]
+    primary: hamstrings
+    secondary: [calves]
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Положение сидя растягивает бицепс бедра сильнее, чем лёжа, —
+      и по исследованиям даёт больше роста.
+    mistakes: |
+      Отрыв таза от сиденья и неполное разгибание.
+
+  - slug: standing_leg_curl
+    name_ru: Сгибание ноги стоя
+    aliases: [сгибания стоя, одной ногой сгибание, standing curl]
+    primary: hamstrings
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      По одной ноге — видно отставание слабой стороны.
+      Таз прижат к опоре.
+    mistakes: |
+      Отклонение корпуса назад для помощи.
+
+  - slug: nordic_curl
+    name_ru: Нордические сгибания
+    aliases: [нордик, нордические, nordic curl, обратная гиперэкстензия ног]
+    primary: hamstrings
+    secondary: []
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Голени зафиксированы, корпус опускается прямой линией.
+      Одно из лучших упражнений для профилактики травм задней
+      поверхности.
+    mistakes: |
+      Сгибание в тазу и падение вместо контролируемого опускания.
+
+  - slug: stiff_leg_deadlift
+    name_ru: Становая на прямых ногах
+    aliases: [мёртвая тяга, становая на прямых, стифф]
+    primary: hamstrings
+    secondary: [glutes, back]
+    equipment: barbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Колени почти прямые, штанга скользит по ногам. Опускать
+      до натяжения задней поверхности, не до пола.
+    mistakes: |
+      Округление поясницы ради глубины и вес от румынской тяги.
+
+  - slug: single_leg_rdl
+    name_ru: Румынская тяга на одной ноге
+    aliases: [румынка на одной, одноногая румынская, single leg rdl]
+    primary: hamstrings
+    secondary: [glutes, core]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Свободная нога уходит назад в одну линию с корпусом.
+      Заодно тренирует равновесие.
+    mistakes: |
+      Разворот таза в сторону и опора носком свободной ноги.
+
+  - slug: glute_ham_raise
+    name_ru: Подъём корпуса на GHD
+    aliases: [ghr, гхр, глют хэм, glute ham raise]
+    primary: hamstrings
+    secondary: [glutes]
+    equipment: machine
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Движение начинается разгибанием таза, затем подключается
+      сгибание колена.
+    mistakes: |
+      Рывок и сгибание только в тазу без работы колена.
+
+  - slug: cable_pull_through
+    name_ru: Протяжка через ноги в блоке
+    aliases: [пул сру, pull through, протяжка между ног]
+    primary: hamstrings
+    secondary: [glutes]
+    equipment: cable
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Отличный способ научиться шарниру в тазу перед становой:
+      блок задаёт направление, ошибиться сложно.
+    mistakes: |
+      Приседание вместо наклона и тяга руками.
+
+  - slug: kettlebell_deadlift
+    name_ru: Становая тяга с гирей
+    aliases: [тяга гири, гиря становая, kettlebell deadlift]
+    primary: hamstrings
+    secondary: [glutes, back]
+    equipment: kettlebell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Гиря между стоп, движение от таза. Хороший вход в становую
+      для тех, кому штанга пока тяжела технически.
+    mistakes: |
+      Круглая спина и подъём руками.
+
+  # -------------------------------------------------------------- Ягодицы
+
+  - slug: glute_bridge
+    name_ru: Ягодичный мостик с пола
+    aliases: [ягодичный мост, glute bridge, мостик на полу, мостик без штанги]
+    primary: glutes
+    secondary: [hamstrings]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      С пола, без скамьи. Пауза наверху на секунду, подбородок
+      к груди — так таз не переразгибается.
+    mistakes: |
+      Прогиб в пояснице вместо сокращения ягодиц наверху.
+
+  - slug: cable_kickback
+    name_ru: Отведение ноги назад в блоке
+    aliases: [махи ногой назад, отведение назад блок, ягодичный кикбэк]
+    primary: glutes
+    secondary: [hamstrings]
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Корпус зафиксирован, работает только тазобедренный сустав.
+      Небольшая амплитуда с паузой.
+    mistakes: |
+      Заброс ноги за счёт прогиба поясницы.
+
+  - slug: abduction_machine
+    name_ru: Отведение ног в тренажёре
+    aliases: [разведение ног, абдукция, разведение ног сидя, тренажёр разведение]
+    primary: glutes
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Наклон корпуса вперёд смещает нагрузку на среднюю ягодичную
+      сильнее, чем прямая спина.
+    mistakes: |
+      Работа рывками и возврат веса до упора со стуком.
+
+  - slug: adduction_machine
+    name_ru: Сведение ног в тренажёре
+    aliases: [сведение ног, аддукция, приводящие мышцы, тренажёр сведение]
+    primary: glutes
+    secondary: [quads]
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Приводящие редко получают прямую работу, а тянутся при
+      широких приседах — стоит их укреплять.
+    mistakes: |
+      Слишком большая амплитуда разведения на старте.
+
+  - slug: frog_pump
+    name_ru: Ягодичный мостик с разведёнными стопами
+    aliases: [лягушка, frog pump, мостик лягушкой]
+    primary: glutes
+    secondary: []
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Стопы вместе, колени в стороны. Изолирует ягодицы сильнее
+      обычного мостика.
+    mistakes: |
+      Отталкивание ногами и работа поясницей.
+
+  - slug: single_leg_hip_thrust
+    name_ru: Ягодичный мостик на одной ноге
+    aliases: [мостик на одной ноге, одноногий хип траст]
+    primary: glutes
+    secondary: [hamstrings]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Свободная нога подтянута к груди или вытянута вперёд.
+      Разница между сторонами обнаруживается сразу.
+    mistakes: |
+      Перекос таза и помощь свободной ногой.
+
+  - slug: banded_lateral_walk
+    name_ru: Ходьба в сторону с резиной
+    aliases: [крабик, ходьба с резинкой, monster walk, шаги с резиной]
+    primary: glutes
+    secondary: []
+    equipment: other
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Резина на щиколотках или чуть выше колен, полуприсед,
+      шаги в сторону без сведения ног.
+    mistakes: |
+      Сведение коленей и раскачивание корпусом.
+
+  - slug: sumo_squat
+    name_ru: Приседания сумо
+    aliases: [плие приседания, сумо присед, широкие приседания]
+    primary: glutes
+    secondary: [quads, hamstrings]
+    equipment: dumbbell
+    type: weight_reps
+    compound: true
+    video_url:
+    tips: |
+      Широкая постановка, носки развёрнуты. Акцент на ягодицы
+      и внутреннюю поверхность бедра.
+    mistakes: |
+      Сведение коленей внутрь и наклон корпуса вперёд.
+
+  - slug: step_down
+    name_ru: Опускания с возвышения
+    aliases: [степ даун, спуск с платформы, step down]
+    primary: glutes
+    secondary: [quads]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Медленный контролируемый спуск на одной ноге, пятка второй
+      едва касается пола.
+    mistakes: |
+      Быстрое падение вниз и заваливание колена внутрь.
+
+  # ----------------------------------------------------------------- Икры
+
+  - slug: seated_calf_raise
+    name_ru: Подъём на носки сидя
+    aliases: [икры сидя, носки сидя, seated calf]
+    primary: calves
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Согнутое колено выключает икроножную и нагружает камбаловидную
+      мышцу — ту, что лежит под ней и добавляет объём.
+    mistakes: |
+      Короткая амплитуда и раскачка на пружине сухожилия.
+
+  - slug: standing_calf_raise_machine
+    name_ru: Подъём на носки стоя в тренажёре
+    aliases: [икры стоя тренажёр, носки в тренажёре стоя]
+    primary: calves
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Пауза внизу в растяжении и наверху в сокращении.
+      Икры отзываются на время под нагрузкой, а не на вес.
+    mistakes: |
+      Пружинить в темпе, при котором работает не мышца,
+      а ахиллово сухожилие.
+
+  - slug: leg_press_calf_raise
+    name_ru: Подъём на носки в жиме ногами
+    aliases: [икры в жиме ногами, носки на платформе]
+    primary: calves
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Носки на краю платформы, колени слегка согнуты и
+      зафиксированы.
+    mistakes: |
+      Сгибание и разгибание коленей — тогда это жим ногами
+      с маленькой амплитудой.
+
+  - slug: donkey_calf_raise
+    name_ru: Подъём на носки в наклоне
+    aliases: [ослик, донки, donkey calf, икры в наклоне]
+    primary: calves
+    secondary: []
+    equipment: machine
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Наклон корпуса растягивает икроножную сильнее, чем
+      положение стоя.
+    mistakes: |
+      Сгибание коленей и неполная амплитуда.
+
+  - slug: single_leg_calf_raise
+    name_ru: Подъём на носок одной ноги
+    aliases: [икры на одной ноге, носок одной ногой]
+    primary: calves
+    secondary: []
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Свой вес на одной ноге часто тяжелее, чем кажется.
+      Рукой держаться только для равновесия.
+    mistakes: |
+      Помощь рукой и раскачивание корпуса.
+
+  # -------------------------------------------------------------- Корпус
+
+  - slug: side_plank
+    name_ru: Боковая планка
+    aliases: [планка боком, боковая, side plank]
+    primary: core
+    secondary: [glutes]
+    equipment: bodyweight
+    type: time
+    compound: false
+    video_url:
+    tips: |
+      Тело прямой линией от головы до пят, таз не проваливается.
+      Работают косые мышцы и средняя ягодичная.
+    mistakes: |
+      Провал таза вниз и разворот корпуса к полу.
+
+  - slug: ab_wheel
+    name_ru: Ролик для пресса
+    aliases: [колесо, ролик, ab wheel, гимнастическое колесо]
+    primary: core
+    secondary: [back, shoulders]
+    equipment: other
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Начинать с колен и небольшой амплитуды. Поясница не должна
+      прогибаться ни на сантиметр.
+    mistakes: |
+      Уход в полную амплитуду раньше времени — самая частая
+      причина сорванной поясницы в зале.
+
+  - slug: cable_crunch
+    name_ru: Скручивания на блоке
+    aliases: [молитва, скручивания в блоке, кранч на блоке]
+    primary: core
+    secondary: []
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Единственное упражнение на пресс, где легко прогрессировать
+      весом. Скручивание позвоночником, а не наклон тазом.
+    mistakes: |
+      Тяга руками и работа тазобедренным суставом вместо пресса.
+
+  - slug: leg_raise_lying
+    name_ru: Подъём ног лёжа
+    aliases: [подъёмы ног, ноги лёжа, подъём ног на полу]
+    primary: core
+    secondary: []
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Поясница прижата к полу на протяжении всего подхода.
+      Руки можно подложить под таз.
+    mistakes: |
+      Отрыв поясницы и опускание ног по инерции.
+
+  - slug: bicycle_crunch
+    name_ru: Велосипед
+    aliases: [велосипед пресс, bicycle crunch, скручивания велосипед]
+    primary: core
+    secondary: []
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Локоть к противоположному колену, медленно. Работают
+      косые мышцы.
+    mistakes: |
+      Тяга руками за голову и высокая скорость без амплитуды.
+
+  - slug: dead_bug
+    name_ru: Мёртвый жук
+    aliases: [дэд баг, dead bug, жук]
+    primary: core
+    secondary: []
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Поясница прижата, противоположные рука и нога опускаются
+      одновременно. Учит держать корпус нейтральным.
+    mistakes: |
+      Отрыв поясницы от пола в момент опускания.
+
+  - slug: pallof_press
+    name_ru: Жим Палоффа
+    aliases: [паллоф, pallof press, антиротация]
+    primary: core
+    secondary: []
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Блок сбоку тянет корпус в поворот, задача — не повернуться.
+      Тренирует то, ради чего пресс и нужен.
+    mistakes: |
+      Разворот корпуса вслед за тросом и задержка дыхания.
+
+  - slug: hollow_hold
+    name_ru: Уголок лёжа
+    aliases: [холлоу, hollow hold, лодочка, уголок]
+    primary: core
+    secondary: []
+    equipment: bodyweight
+    type: time
+    compound: false
+    video_url:
+    tips: |
+      Поясница вдавлена в пол, руки и ноги вытянуты. Чем ниже
+      конечности, тем тяжелее.
+    mistakes: |
+      Прогиб в пояснице, при котором смысл упражнения теряется.
+
+  - slug: woodchopper
+    name_ru: Дровосек на блоке
+    aliases: [дровосек, вудчоппер, woodchopper, диагональ на блоке]
+    primary: core
+    secondary: [shoulders]
+    equipment: cable
+    type: weight_reps
+    compound: false
+    video_url:
+    tips: |
+      Движение по диагонали сверху вниз, поворот идёт от корпуса,
+      руки прямые.
+    mistakes: |
+      Работа только руками и отсутствие поворота грудного отдела.
+
+  - slug: sit_up
+    name_ru: Подъём корпуса
+    aliases: [ситап, sit up, подъёмы туловища]
+    primary: core
+    secondary: []
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Поднимаемся до вертикали, опускаемся под контролем.
+      Стопы можно не фиксировать — так меньше работают сгибатели бедра.
+    mistakes: |
+      Рывок руками за голову и падение назад на пол.
+
+  - slug: suitcase_carry
+    name_ru: Прогулка с весом в одной руке
+    aliases: [чемодан, suitcase carry, переноска одной рукой]
+    primary: core
+    secondary: [forearms]
+    equipment: dumbbell
+    type: distance
+    compound: true
+    video_url:
+    tips: |
+      Вес в одной руке, задача — идти не заваливаясь. Косые
+      мышцы работают на удержание.
+    mistakes: |
+      Наклон в сторону веса и подъём плеча.
+
+  - slug: hanging_knee_raise
+    name_ru: Подъём коленей в висе
+    aliases: [колени в висе, подъём колен на турнике]
+    primary: core
+    secondary: [forearms]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: false
+    video_url:
+    tips: |
+      Более лёгкая версия подъёма прямых ног. Таз слегка
+      подкручивается в верхней точке.
+    mistakes: |
+      Раскачивание и подъём коленей по инерции.
+
+  # -------------------------------------------------------------- Кардио
+
+  - slug: incline_walk
+    name_ru: Ходьба в горку
+    aliases: [ходьба в наклон, дорожка в горку, incline walk]
+    primary: cardio
+    secondary: [glutes, calves]
+    equipment: machine
+    type: time
+    compound: true
+    video_url:
+    tips: |
+      Наклон 10–15%, скорость такая, чтобы держаться без поручней.
+      Лучшее кардио, если колени не любят бег.
+    mistakes: |
+      Опора на поручни, которая снижает нагрузку почти вдвое.
+
+  - slug: stair_climber
+    name_ru: Степпер
+    aliases: [лестница, степпер, stairmaster, эскалатор]
+    primary: cardio
+    secondary: [glutes, quads]
+    equipment: machine
+    type: time
+    compound: true
+    video_url:
+    tips: |
+      Корпус вертикально, шаг полный на всю ступень.
+      Ягодицы получают заметную работу.
+    mistakes: |
+      Повисание на поручнях и мелкий частый шаг.
+
+  - slug: assault_bike
+    name_ru: Эйр-байк
+    aliases: [воздушный велотренажёр, assault bike, эйрбайк, ассолт]
+    primary: cardio
+    secondary: [shoulders, quads]
+    equipment: machine
+    type: time
+    compound: true
+    video_url:
+    tips: |
+      Руки и ноги работают вместе, сопротивление растёт от усилия.
+      Тридцати секунд хватает, чтобы понять почему его не любят.
+    mistakes: |
+      Работа только ногами и слишком длинные интервалы на старте.
+
+  - slug: sled_push
+    name_ru: Толкание саней
+    aliases: [сани, прауллер, sled push, толкание салазок]
+    primary: cardio
+    secondary: [quads, glutes, calves]
+    equipment: other
+    type: distance
+    compound: true
+    video_url:
+    tips: |
+      Корпус наклонён, шаги короткие и частые. Нет негативной
+      фазы — почти не даёт крепатуры.
+    mistakes: |
+      Слишком большой вес, превращающий движение в статику.
+
+  - slug: burpee
+    name_ru: Бёрпи
+    aliases: [берпи, burpee, бурпи]
+    primary: cardio
+    secondary: [chest, quads, core]
+    equipment: bodyweight
+    type: bodyweight_reps
+    compound: true
+    video_url:
+    tips: |
+      Упор лёжа, отжимание, прыжок. Считается повторениями,
+      а не временем.
+    mistakes: |
+      Провал поясницы в упоре и пропуск отжимания при усталости.
+
+  - slug: swimming
+    name_ru: Плавание
+    aliases: [бассейн, плаванье, swimming]
+    primary: cardio
+    secondary: [back, shoulders]
+    equipment: other
+    type: time
+    compound: true
+    video_url:
+    tips: |
+      Нулевая ударная нагрузка на суставы. Хорошо ложится
+      в день отдыха между силовыми.
+    mistakes: |
+      Оценка нагрузки по времени в воде, а не по реальному
+      плаванию.
+
+  - slug: walking
+    name_ru: Ходьба
+    aliases: [пешком, прогулка, шаги, walking]
+    primary: cardio
+    secondary: []
+    equipment: bodyweight
+    type: distance
+    compound: true
+    video_url:
+    tips: |
+      Самое недооценённое средство: не мешает восстановлению
+      и легко набирается в течение дня.
+    mistakes: |
+      Попытка заменить ходьбой силовую работу.

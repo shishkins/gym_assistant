@@ -243,3 +243,64 @@ async def test_is_favourite_does_not_create_a_row(session: AsyncSession) -> None
 
     assert await service.is_favourite(user_id, plank.id) is False
     assert await service.favourites(user_id) == []
+
+
+# --- ranking on a large catalogue ----------------------------------------
+#
+# All four broke when the catalogue grew from 49 to 167 and none of them
+# failed loudly: the search still returned exercises, just not the ones
+# anyone wanted. The tie-breaker used to be the length of the name.
+
+
+async def test_a_staple_outranks_its_variations(session: AsyncSession) -> None:
+    """ "Приседания со штангой" must beat "Гакк-приседания"."""
+    user_id = await _user(session, 3018)
+
+    found = await ExerciseService(session).search("приседания", user_id=user_id, limit=5)
+
+    assert found[0].slug == "squat"
+
+
+async def test_a_staple_wins_through_a_typo_too(session: AsyncSession) -> None:
+    """The fuzzy path dropped the barbell squat out of the top six entirely."""
+    user_id = await _user(session, 3019)
+
+    found = await ExerciseService(session).search("приседанья", user_id=user_id, limit=5)
+
+    assert found[0].slug == "squat"
+
+
+async def test_a_typo_prefers_the_closest_word_over_a_compound(
+    session: AsyncSession,
+) -> None:
+    """ "планко" used to return "Плавание" first - it is compound, планка is not.
+
+    When the query is already understood, compound-first is the order a
+    lifter thinks in. When we are guessing at a typo, the closest text is
+    the whole point.
+    """
+    user_id = await _user(session, 3020)
+
+    found = await ExerciseService(session).search("планко", user_id=user_id, limit=5)
+
+    assert found[0].slug == "plank"
+
+
+async def test_searching_a_muscle_leads_with_a_staple(session: AsyncSession) -> None:
+    """ "трицепс" led with the JM press - an accessory almost nobody does."""
+    user_id = await _user(session, 3021)
+
+    found = await ExerciseService(session).search("трицепс", user_id=user_id, limit=3)
+
+    assert found[0].slug == "close_grip_bench_press"
+
+
+async def test_the_catalogue_overflows_a_page_on_its_own(session: AsyncSession) -> None:
+    """The reason paging was invisible: no group ever filled a page."""
+    user_id = await _user(session, 3022)
+    service = ExerciseService(session)
+
+    groups = {g.name_ru: g.id for g in await service.muscle_groups()}
+    for name in ("Спина", "Грудь", "Квадрицепс"):
+        total = await service.count_by_muscle_group(groups[name], user_id=user_id)
+        assert total > 8, f"{name}: {total} — снова одна страница"

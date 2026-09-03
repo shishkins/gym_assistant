@@ -127,20 +127,40 @@ class ExerciseRepository:
             return []
 
         precise, fuzzy, rank, closeness = self._search_terms(needle)
-        for condition in (precise, fuzzy):
+
+        # Two different questions, so two different orders.
+        #
+        # A precise hit means the query is understood: then the useful order
+        # is the one a lifter thinks in - base movements first, staples above
+        # their variations. Popularity replaced name length here, which on a
+        # large catalogue decided this silently and wrongly: "Гакк-приседания"
+        # is shorter than "Приседания со штангой" and used to win.
+        #
+        # A fuzzy hit means we are guessing at a typo. There the closest text
+        # is the whole point, and compound-first actively hurts: "планко"
+        # matched "Плавание" (compound) above "Планка" (isolation).
+        orders = {
+            "precise": (
+                rank,
+                Exercise.is_compound.desc(),
+                Exercise.popularity,
+                closeness.desc(),
+                Exercise.name_ru,
+            ),
+            "fuzzy": (
+                closeness.desc(),
+                Exercise.popularity,
+                Exercise.is_compound.desc(),
+                Exercise.name_ru,
+            ),
+        }
+
+        for kind, condition in (("precise", precise), ("fuzzy", fuzzy)):
             stmt = (
                 select(Exercise)
                 .join(MuscleGroup, MuscleGroup.id == Exercise.primary_muscle_group_id)
                 .where(self._visible_to(user_id), condition)
-                # Inside a muscle group the compound movements come first, the
-                # same order the group listing uses.
-                .order_by(
-                    rank,
-                    Exercise.is_compound.desc(),
-                    closeness.desc(),
-                    func.length(Exercise.name_ru),
-                    Exercise.name_ru,
-                )
+                .order_by(*orders[kind])
                 .offset(offset)
                 .limit(limit)
             )
@@ -177,7 +197,7 @@ class ExerciseRepository:
             )
             # Compound movements first: they are what a session is built around.
             # name_ru is the tiebreaker so paging stays stable between calls.
-            .order_by(Exercise.is_compound.desc(), Exercise.name_ru)
+            .order_by(Exercise.is_compound.desc(), Exercise.popularity, Exercise.name_ru)
             .offset(offset)
             .limit(limit)
         )

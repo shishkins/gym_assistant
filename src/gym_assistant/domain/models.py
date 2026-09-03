@@ -375,6 +375,10 @@ class Exercise(Base, TimestampMixin):
     equipment: Mapped[str] = mapped_column(String(16), nullable=False)
     exercise_type: Mapped[str] = mapped_column(String(20), nullable=False)
     is_compound: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    # Меньше значит выше в выдаче. Базовые движения - 10, вариации и
+    # свои упражнения - 50. Без этого порядок решала длина названия, и
+    # "приседанья" переставали находить приседания со штангой.
+    popularity: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("50"))
 
     video_url: Mapped[str | None] = mapped_column(Text)
     technique_tips: Mapped[str | None] = mapped_column(Text)
