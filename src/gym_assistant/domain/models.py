@@ -108,6 +108,26 @@ class ExerciseType(StrEnum):
     DISTANCE = "distance"  # farmer's walk: metres
 
 
+class Role(StrEnum):
+    """Ordered least to most: every check is "at least this".
+
+    Declared in order so ``RANK`` below can be built from it - an admin is
+    meant to be able to do everything a subscriber can, and spelling that
+    out as separate checks is how one of them eventually gets forgotten.
+    """
+
+    REGULAR_USER = "regular_user"
+    SUBSCRIPTION_USER = "subscription_user"
+    ADMIN = "admin"
+
+
+ROLE_RANK = {role: index for index, role in enumerate(Role)}
+
+
+def role_at_least(role: Role, required: Role) -> bool:
+    return ROLE_RANK[role] >= ROLE_RANK[required]
+
+
 def _enum_check(column: str, enum: type[StrEnum]) -> str:
     allowed = ", ".join(f"'{member.value}'" for member in enum)
     return f"{column} IS NULL OR {column} IN ({allowed})"
@@ -133,6 +153,17 @@ class User(Base, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    # Exists for the ORM cascade, not for reading: the access middleware asks
+    # AccessService, which fetches the row by primary key. Left as the noisy
+    # default on purpose - reading a role through here depends on how the
+    # user happened to be loaded, and that dependency already cost one
+    # MissingGreenlet on every update.
+    access: Mapped[UserAccess | None] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="raise",
+        foreign_keys="UserAccess.user_id",
+    )
     measurements: Mapped[list[BodyMeasurement]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -141,6 +172,46 @@ class User(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<User id={self.id} telegram_id={self.telegram_id}>"
+
+
+class UserAccess(Base, TimestampMixin):
+    """What a user is allowed to do, and until when.
+
+    A row per user rather than a column on ``users`` because access is not
+    part of a profile: it carries who granted it, when, and until when, and
+    it is read by the middleware rather than by anything that shows a card.
+
+    No row means ``regular_user``. That is deliberate - opening the bot must
+    not require writing a row, and a table that only holds the exceptions
+    stays small enough to read by eye.
+    """
+
+    __tablename__ = "user_access"
+    __table_args__ = (
+        CheckConstraint(_enum_check("role", Role), name="ck_user_access_role"),
+        Index("ix_user_access_expires_at", "expires_at"),
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    # Kept when the granting admin is deleted: losing the audit trail is a
+    # worse outcome than a dangling name.
+    granted_by_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # NULL is "no end date": what an admin has, and what a lifetime grant is.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    note: Mapped[str | None] = mapped_column(Text)
+
+    user: Mapped[User] = relationship(back_populates="access", foreign_keys=[user_id], lazy="raise")
+
+    def __repr__(self) -> str:
+        return f"<UserAccess user_id={self.user_id} role={self.role}>"
 
 
 class UserProfile(Base, TimestampMixin):

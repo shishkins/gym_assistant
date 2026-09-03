@@ -7,12 +7,15 @@ Order is behaviour, not style:
   payloads and onboarding claims them only while its states are set;
 * ``workouts`` before ``exercises``, because a running session owns free
   text: what you type between reps is a set, not a catalogue search;
+* ``admin`` early, because its whole router is filtered on the admin
+  role: a non-admin falls straight through it as if it were not there;
 * ``fallback`` last, since it matches everything.
 """
 
 from aiogram import Router
 
 from gym_assistant.bot.handlers import (
+    admin,
     common,
     exercises,
     fallback,
@@ -28,6 +31,8 @@ from gym_assistant.bot.handlers import (
 def get_routers() -> tuple[Router, ...]:
     return (
         common.router,
+        admin.router,
+        admin.public_router,
         menu.router,
         onboarding.router,
         profile.router,

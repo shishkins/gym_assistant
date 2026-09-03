@@ -27,7 +27,11 @@ class Settings(BaseSettings):
 
     # --- Telegram ---
     bot_token: SecretStr
+    # Empty means the bot answers everyone; set it to close the bot down.
     allowed_telegram_ids: str = ""
+    # Owners. Their admin rights are restored whenever they touch the bot,
+    # so wiping the database cannot lock them out of their own commands.
+    admin_telegram_ids: str = ""
 
     # --- PostgreSQL ---
     postgres_user: str = "gym"
@@ -49,16 +53,25 @@ class Settings(BaseSettings):
     stt_url: str = "http://stt:8000"
     stt_model: str = "small"
 
-    @property
-    def allowed_ids(self) -> frozenset[int]:
-        """Telegram user IDs allowed to use the bot.
+    @staticmethod
+    def _ids(raw: str) -> frozenset[int]:
+        """Parses ``123,456``.
 
         Parsed by hand instead of being declared as ``set[int]`` because
         pydantic-settings JSON-decodes complex types from env vars, which
         would reject a plain ``123,456`` string.
         """
-        raw = self.allowed_telegram_ids.replace(";", ",")
-        return frozenset(int(part) for part in raw.split(",") if part.strip())
+        return frozenset(int(part) for part in raw.replace(";", ",").split(",") if part.strip())
+
+    @property
+    def allowed_ids(self) -> frozenset[int]:
+        """Who may talk to the bot. Empty means everyone."""
+        return self._ids(self.allowed_telegram_ids)
+
+    @property
+    def admin_ids(self) -> frozenset[int]:
+        """Owners, kept as admins no matter what the database says."""
+        return self._ids(self.admin_telegram_ids)
 
     @property
     def database_url(self) -> str:

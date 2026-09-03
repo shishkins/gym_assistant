@@ -25,19 +25,27 @@ START_GREETING = (
 START_RETURNING = "👋 С возвращением, {name}!\n\n{summary}"
 
 HELP = (
-    "<b>Что я умею сейчас</b>\n\n"
+    "<b>Что я умею</b>\n\n"
+    "<b>Тренировки</b>\n"
+    "/workout — начать или продолжить тренировку\n"
+    "/last — последняя завершённая тренировка\n"
+    "/exercises — справочник упражнений\n\n"
+    "<b>Прогресс</b>\n"
+    "/stats — отчёты и графики\n"
+    "/export — выгрузить всё в CSV\n\n"
     "<b>Профиль и тело</b>\n"
     "/profile — профиль, просмотр и правка\n"
     "/weight — записать вес\n"
     "/photos — фото прогресса\n\n"
     "<b>Прочее</b>\n"
-    "/start — начало работы\n"
-    "/cancel — отменить текущее действие\n"
-    "/ping — проверка связи\n\n"
-    "Можно просто прислать фото — я сохраню его как фото прогресса.\n"
-    "Если в подписи будет число, запишу его как вес.\n\n"
-    "<i>В разработке:</i> "
-    "голосовой ввод и AI-ассистент."
+    "/menu — всё меню в одном месте\n"
+    "/whoami — ваш уровень доступа\n"
+    "/cancel — отменить текущее действие\n\n"
+    "Во время тренировки подход можно просто написать: "
+    "<code>80х8</code>, <code>80 8</code>, <code>100х5х3</code>.\n"
+    "Можно прислать фото — сохраню как фото прогресса; "
+    "если в подписи будет число, запишу его как вес.\n\n"
+    "<i>В разработке:</i> голосовой ввод и AI-ассистент."
 )
 
 PING_OK = "🏓 На связи.\n\nВерсия: <code>{version}</code>\nОкружение: <code>{environment}</code>"
@@ -500,3 +508,49 @@ BTN_STATS_PERIOD = "🗓 Период: {period}"
 BTN_STATS_LAST_WITH = "📋 Последняя тренировка с ним"
 BTN_STATS_PICK_OTHER = "📈 Другое упражнение"
 BTN_MENU_STATS = "📊 Статистика"
+
+
+# --- Roles and admin ------------------------------------------------------
+
+WHOAMI = (
+    "Ваш Telegram ID: <code>{telegram_id}</code>\nУровень доступа: <b>{role}</b>\nСрок: {until}"
+)
+
+ADMIN_FOREVER = "бессрочно"
+ADMIN_UNTIL = "на {days} дн."
+ADMIN_UNTIL_DATE = "до {when}"
+ADMIN_LAPSED = "истёк {when} — доступ уже обычный"
+
+ADMIN_GRANT_USAGE = (
+    "<b>/grant</b> — выдать доступ.\n\n"
+    "<code>/grant &lt;telegram_id&gt; &lt;роль&gt; [дней]</code>\n\n"
+    "Роли: <code>admin</code>, <code>sub</code> (подписчик), <code>user</code> (обычный).\n"
+    "Без числа дней — бессрочно.\n\n"
+    "Например: <code>/grant 402666721 sub 30</code>"
+)
+ADMIN_REVOKE_USAGE = (
+    "<b>/revoke</b> — вернуть обычный доступ.\n\n<code>/revoke &lt;telegram_id&gt;</code>"
+)
+ADMIN_BAD_ID = "«{value}» не похоже на Telegram ID — нужно число."
+ADMIN_BAD_ROLE = (
+    "Роли «{value}» нет. Доступны: <code>admin</code>, <code>sub</code>, <code>user</code>."
+)
+ADMIN_BAD_DAYS = "«{value}» не похоже на число дней — нужно целое положительное."
+ADMIN_USER_UNKNOWN = (
+    "Пользователя <code>{telegram_id}</code> в базе нет.\n\n"
+    "Он появится, как только напишет боту /start — попросите его это сделать."
+)
+ADMIN_GRANTED = "{who} → <b>{role}</b>, {until}."
+ADMIN_REVOKED = "{who} снова обычный пользователь."
+ADMIN_NOTHING_TO_REVOKE = "У него и так обычный доступ."
+ADMIN_USERS_HEADER = "👥 <b>Выданные доступы</b>\n\n"
+ADMIN_USER_LINE = "{who} · <code>{telegram_id}</code>\n  {role}, {until}"
+ADMIN_USERS_EMPTY = (
+    "Никому ничего не выдано — все пользователи обычные.\n\n"
+    "Выдать: <code>/grant &lt;telegram_id&gt; sub 30</code>"
+)
+
+ACCESS_NEEDS_SUBSCRIPTION = (
+    "Эта возможность доступна по подписке.\n\n"
+    "Ваш ID: <code>{telegram_id}</code> — передайте его администратору."
+)

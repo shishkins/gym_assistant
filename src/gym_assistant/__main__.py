@@ -15,6 +15,7 @@ from gym_assistant import __version__
 from gym_assistant.bot.commands import BOT_COMMANDS
 from gym_assistant.bot.handlers import get_routers
 from gym_assistant.bot.middlewares import (
+    AccessMiddleware,
     DbSessionMiddleware,
     LoggingMiddleware,
     UserMiddleware,
@@ -48,6 +49,7 @@ async def main() -> None:
     dispatcher.update.outer_middleware(WhitelistMiddleware(settings.allowed_ids))
     dispatcher.update.outer_middleware(DbSessionMiddleware(session_factory))
     dispatcher.update.outer_middleware(UserMiddleware())
+    dispatcher.update.outer_middleware(AccessMiddleware(settings.admin_ids))
 
     dispatcher.include_routers(*get_routers())
 

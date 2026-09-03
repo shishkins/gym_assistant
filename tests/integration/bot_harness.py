@@ -31,7 +31,12 @@ from aiogram.types import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.bot.handlers import get_routers
-from gym_assistant.bot.middlewares import LoggingMiddleware, UserMiddleware, WhitelistMiddleware
+from gym_assistant.bot.middlewares import (
+    AccessMiddleware,
+    LoggingMiddleware,
+    UserMiddleware,
+    WhitelistMiddleware,
+)
 from gym_assistant.config import Settings
 
 TOKEN = "42:test-token-not-real"
@@ -224,6 +229,9 @@ class _HolderSessionMiddleware:
 # Routers are module-level singletons and a Router can belong to exactly one
 # Dispatcher, so the dispatcher is built once and reused across tests. What
 # varies per test - the database session and the FSM state - is swapped out.
+# Mutable so a test can decide whether its user is an owner.
+_ADMIN_IDS: set[int] = set()
+
 _HOLDER = _SessionHolder()
 _STORAGE = MemoryStorage()
 _DISPATCHER: Dispatcher | None = None
@@ -242,14 +250,20 @@ def _dispatcher(settings: Settings) -> Dispatcher:
     dispatcher.update.outer_middleware(WhitelistMiddleware(frozenset({TELEGRAM_USER_ID})))
     dispatcher.update.outer_middleware(_HolderSessionMiddleware(_HOLDER))
     dispatcher.update.outer_middleware(UserMiddleware())
+    dispatcher.update.outer_middleware(AccessMiddleware(_ADMIN_IDS))
     dispatcher.include_routers(*get_routers())
 
     _DISPATCHER = dispatcher
     return dispatcher
 
 
-def build_harness(db_session: AsyncSession, settings: Settings) -> BotHarness:
+def build_harness(
+    db_session: AsyncSession, settings: Settings, *, admin: bool = False
+) -> BotHarness:
     _HOLDER.session = db_session
+    _ADMIN_IDS.clear()
+    if admin:
+        _ADMIN_IDS.add(TELEGRAM_USER_ID)
     # Every test starts with no conversation in progress.
     _STORAGE.storage.clear()
 

@@ -1,5 +1,6 @@
 """Use cases. Handlers, AI tools and the future API all go through here."""
 
+from gym_assistant.domain.services.access_service import Access, AccessService, resolve
 from gym_assistant.domain.services.exercise_service import (
     CatalogueStats,
     DuplicateExerciseError,
@@ -20,6 +21,8 @@ from gym_assistant.domain.services.workout_service import (
 )
 
 __all__ = [
+    "Access",
+    "AccessService",
     "CatalogueStats",
     "DuplicateExerciseError",
     "EmptyMeasurementError",
@@ -33,4 +36,5 @@ __all__ = [
     "ProfileSummary",
     "WorkoutService",
     "WorkoutSummary",
+    "resolve",
 ]

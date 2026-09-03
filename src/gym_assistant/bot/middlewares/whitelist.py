@@ -1,8 +1,12 @@
-"""Access control.
+"""The hard gate: may this person talk to the bot at all.
 
-The bot is private during the MVP: only Telegram IDs listed in
-``ALLOWED_TELEGRAM_IDS`` get through. Everyone else is told their own ID,
-which removes the need to hunt for it with a third-party bot.
+Distinct from roles. Roles decide which *features* a user gets and live in
+the database; this decides whether the bot answers at all, and lives in the
+environment so that closing the bot never depends on a working database.
+
+**An empty ``ALLOWED_TELEGRAM_IDS`` means the bot is open to everyone**, who
+then arrive as ordinary users. Set it to close the bot down again - during a
+rollout, or if it ever gets abused.
 """
 
 from __future__ import annotations
@@ -23,10 +27,7 @@ class WhitelistMiddleware(BaseMiddleware):
     def __init__(self, allowed_ids: frozenset[int]) -> None:
         self._allowed_ids = allowed_ids
         if not allowed_ids:
-            log.warning(
-                "whitelist_empty",
-                hint="ALLOWED_TELEGRAM_IDS is not set - every user will be rejected",
-            )
+            log.info("whitelist_open", hint="ALLOWED_TELEGRAM_IDS is empty - the bot is public")
 
     async def __call__(
         self,
@@ -39,7 +40,7 @@ class WhitelistMiddleware(BaseMiddleware):
             # Service updates without an author (e.g. channel posts) are ignored.
             return None
 
-        if user.id in self._allowed_ids:
+        if not self._allowed_ids or user.id in self._allowed_ids:
             return await handler(event, data)
 
         log.info("access_denied", user_id=user.id, username=user.username)
