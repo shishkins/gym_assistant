@@ -61,3 +61,8 @@ deleted=$(find backups -name "${POSTGRES_DB}-*.dump" -mtime "+${KEEP_DAYS}" -pri
 if [ "$deleted" -gt 0 ]; then
     echo "backup: removed $deleted dump(s) older than ${KEEP_DAYS} days"
 fi
+
+# Leftovers from dumps that failed. Kept for a day in case someone wants to
+# look at one, then cleared: the backups directory is read during an
+# incident, and it should hold backups, not debris.
+find backups -name "*.dump.partial" -mtime +1 -delete
