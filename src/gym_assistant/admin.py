@@ -65,9 +65,7 @@ async def _list() -> None:
         for user, stored in rows:
             current = resolve(stored, now=now)
             lapsed = (
-                " (истёк)"
-                if stored is not None and current.role is not Role(stored.role)
-                else ""
+                " (истёк)" if stored is not None and current.role is not Role(stored.role) else ""
             )
             if stored is None:
                 until = "-"

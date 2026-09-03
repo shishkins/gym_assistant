@@ -88,9 +88,7 @@ class AiAssistant:
         # of two gave up on a passing overload, and a question that dies
         # halfway is worse for a bot than a few more seconds of waiting.
         self._client = (
-            anthropic.AsyncAnthropic(api_key=key.get_secret_value(), max_retries=4)
-            if key
-            else None
+            anthropic.AsyncAnthropic(api_key=key.get_secret_value(), max_retries=4) if key else None
         )
 
     @property

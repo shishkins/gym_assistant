@@ -154,9 +154,7 @@ async def cmd_users(message: Message, session: AsyncSession) -> None:
                 else ru.ADMIN_NO_GRANT,
             )
         )
-    await message.answer(
-        ru.ADMIN_USERS_HEADER.format(count=len(rows)) + "\n".join(lines)
-    )
+    await message.answer(ru.ADMIN_USERS_HEADER.format(count=len(rows)) + "\n".join(lines))
 
 
 def _who(target: User) -> str:
