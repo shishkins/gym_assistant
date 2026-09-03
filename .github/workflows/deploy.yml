@@ -83,7 +83,22 @@ jobs:
             git fetch --all
             git reset --hard origin/main
 
-            echo "BOT_IMAGE=ghcr.io/${{ github.repository }}-bot:sha-${{ github.sha }}" > .env.image
+            IMAGE="ghcr.io/${{ github.repository }}-bot:sha-${{ github.sha }}"
+
+            # BOT_IMAGE goes into .env, which compose reads on its own, rather
+            # than into a second file that every command has to be told about.
+            # It used to live in .env.image, and a plain `docker compose` on
+            # the server then silently fell back to the stale local build -
+            # `run` failed confusingly, and `up -d` would have quietly rolled
+            # the running bot back to it.
+            #
+            # .env is only replaced by the final mv, so a failure anywhere
+            # above leaves the original untouched.
+            grep -v '^BOT_IMAGE=' .env > .env.next
+            echo "BOT_IMAGE=$IMAGE" >> .env.next
+            chmod 600 .env.next
+            mv .env.next .env
+            rm -f .env.image
 
             # The package is private by default, so the server has to
             # authenticate to pull it. Using the job's own short-lived token
@@ -93,14 +108,14 @@ jobs:
               | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
-            docker compose --env-file .env --env-file .env.image pull bot
+            docker compose pull bot
 
             # Before the migration, not after: a migration that corrupts data
             # is exactly the case where last night's dump is too old.
             ./scripts/backup.sh pre-migrate
 
-            docker compose --env-file .env --env-file .env.image run --rm bot alembic upgrade head
-            docker compose --env-file .env --env-file .env.image up -d
+            docker compose run --rm bot alembic upgrade head
+            docker compose up -d
 
             # Give the bot a moment, then verify it is actually alive.
             sleep 10
