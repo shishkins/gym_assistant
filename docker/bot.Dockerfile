@@ -20,6 +20,9 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY README.md alembic.ini ./
 COPY migrations ./migrations
 COPY seeds ./seeds
+# Maintenance scripts need the app and the database, so they run inside the
+# image: docker compose run --rm bot python scripts/demo_history.py --reset
+COPY scripts ./scripts
 COPY src ./src
 RUN uv sync --frozen --no-dev
 
