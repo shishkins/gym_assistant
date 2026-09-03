@@ -32,7 +32,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -339,6 +339,10 @@ class Exercise(Base, TimestampMixin):
             unique=True,
         ),
         Index("ix_exercises_owner", "owner_user_id"),
+        # Popularity is in the ORDER BY of every search, so it gets an index -
+        # and it gets declared here, not only in the migration, or the next
+        # autogenerate proposes dropping it.
+        Index("ix_exercises_popularity", "popularity"),
         # Alias lookup is an array-containment test.
         Index("ix_exercises_aliases", "aliases", postgresql_using="gin"),
         # Trigram index: powers typo-tolerant search on the display name.
@@ -545,3 +549,110 @@ class WorkoutSet(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<WorkoutSet id={self.id} exercise_id={self.exercise_id}>"
+
+
+class AiSession(Base, TimestampMixin):
+    """One conversation with the assistant.
+
+    The Messages API is stateless: every request resends the whole exchange.
+    So the exchange has to live somewhere, and it lives here rather than in
+    Redis - a dialogue about training history is worth keeping when the bot
+    restarts, and it is the only record of what the model was told.
+    """
+
+    __tablename__ = "ai_sessions"
+    __table_args__ = (
+        # One live conversation per person. Anything else and a second
+        # message could land in a different thread than the first.
+        Index(
+            "uq_ai_sessions_one_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("is_active"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    last_used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    messages: Mapped[list[AiMessage]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="AiMessage.id",
+        lazy="raise",
+    )
+
+    def __repr__(self) -> str:
+        return f"<AiSession id={self.id} user_id={self.user_id}>"
+
+
+class AiMessage(Base):
+    """One turn, stored as the content blocks the API returned.
+
+    Not the text: thinking blocks, tool_use and tool_result have to be
+    echoed back unchanged on the next request, and flattening them to a
+    string loses the conversation the moment a tool is involved.
+    """
+
+    __tablename__ = "ai_messages"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ai_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    session: Mapped[AiSession] = relationship(back_populates="messages", lazy="raise")
+
+    def __repr__(self) -> str:
+        return f"<AiMessage id={self.id} role={self.role}>"
+
+
+class AiUsage(Base):
+    """What every call cost, in tokens and in money.
+
+    Written after each API call, before the answer is sent. The monthly sum
+    is what the spending limit is checked against - a limit that depends on
+    a counter kept in memory is not a limit.
+    """
+
+    __tablename__ = "ai_usage_log"
+    __table_args__ = (Index("ix_ai_usage_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("ai_sessions.id", ondelete="SET NULL")
+    )
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    cache_read_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    cache_write_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    # Six decimal places: a single cheap call costs fractions of a cent, and
+    # rounding those to two would report every one of them as free.
+    cost_usd: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+    def __repr__(self) -> str:
+        return f"<AiUsage id={self.id} model={self.model} cost={self.cost_usd}>"
