@@ -14,7 +14,12 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from gym_assistant.ai.client import AiAssistant, AiUnavailableError, BudgetExceededError
+from gym_assistant.ai.client import (
+    AiAssistant,
+    AiOverloadedError,
+    AiUnavailableError,
+    BudgetExceededError,
+)
 from gym_assistant.ai.conversation import ConversationService
 from gym_assistant.ai.tools import ToolContext
 from gym_assistant.ai.usage import UsageService
@@ -108,6 +113,10 @@ async def _answer(
         )
     except BudgetExceededError:
         await message.answer(ru.AI_BUDGET_SPENT)
+        return
+    except AiOverloadedError as exc:
+        log.info("ai_overloaded", reason=str(exc))
+        await message.answer(ru.AI_OVERLOADED)
         return
     except AiUnavailableError as exc:
         log.warning("ai_unavailable", reason=str(exc))

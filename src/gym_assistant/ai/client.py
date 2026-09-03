@@ -39,6 +39,12 @@ class AiUnavailableError(RuntimeError):
     """No API key, or the API refused to talk to us."""
 
 
+class AiOverloadedError(AiUnavailableError):
+    """Anthropic is busy right now. Worth saying so - it is not our fault
+    and it passes on its own, which is a different message than a bot that
+    is simply broken."""
+
+
 @dataclass
 class Answer:
     text: str
@@ -73,7 +79,14 @@ class AiAssistant:
         self._settings = settings
         self._usage = usage
         key = settings.anthropic_api_key
-        self._client = anthropic.AsyncAnthropic(api_key=key.get_secret_value()) if key else None
+        # The SDK retries 429 and 5xx with exponential backoff. Its default
+        # of two gave up on a passing overload, and a question that dies
+        # halfway is worse for a bot than a few more seconds of waiting.
+        self._client = (
+            anthropic.AsyncAnthropic(api_key=key.get_secret_value(), max_retries=4)
+            if key
+            else None
+        )
 
     @property
     def available(self) -> bool:
@@ -175,6 +188,11 @@ class AiAssistant:
             )
         except anthropic.APIStatusError as exc:
             log.warning("ai_api_error", status=exc.status_code, message=exc.message)
+            # 529 overloaded, 429 rate limited: both pass by themselves, and
+            # telling someone to try again in a minute is honest advice
+            # rather than the shrug a generic failure gives them.
+            if exc.status_code in (429, 529):
+                raise AiOverloadedError(str(exc.status_code)) from exc
             raise AiUnavailableError(str(exc.status_code)) from exc
         except anthropic.APIConnectionError as exc:
             log.warning("ai_api_unreachable")

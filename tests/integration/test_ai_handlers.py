@@ -14,7 +14,12 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from gym_assistant.ai.client import Answer, BudgetExceededError
+from gym_assistant.ai.client import (
+    AiOverloadedError,
+    AiUnavailableError,
+    Answer,
+    BudgetExceededError,
+)
 from gym_assistant.ai.conversation import ConversationService
 from gym_assistant.ai.usage import Tokens
 from gym_assistant.bot.handlers import ai as ai_handlers
@@ -209,3 +214,41 @@ async def test_usage_report_is_available_to_a_subscriber(
     await bot.send("/ai_usage")
 
     assert "$" in bot.session.last_text
+
+
+async def test_an_overloaded_api_is_reported_as_temporary(
+    bot: BotHarness, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """529 passes by itself, so the message must say "try again", not
+    "something is broken" - and must say the attempt was free."""
+    await _subscribe(session)
+
+    class Overloaded(StubAssistant):
+        async def ask(self, ctx: Any, question: str, **kwargs: Any) -> Answer:
+            raise AiOverloadedError("529")
+
+    monkeypatch.setattr(ai_handlers, "build_assistant", lambda *_: Overloaded())
+
+    await bot.send("/ask как растёт жим")
+
+    reply = bot.session.last_text.lower()
+    assert "перегружен" in reply
+    assert "не стоило" in reply, "человек должен знать, что попытка была бесплатной"
+
+
+async def test_a_real_failure_is_not_dressed_up_as_overload(
+    bot: BotHarness, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AiOverloadedError subclasses AiUnavailableError, so the except order
+    matters: swap the two clauses and every failure reads as "try again"."""
+    await _subscribe(session)
+
+    class Broken(StubAssistant):
+        async def ask(self, ctx: Any, question: str, **kwargs: Any) -> Answer:
+            raise AiUnavailableError("400")
+
+    monkeypatch.setattr(ai_handlers, "build_assistant", lambda *_: Broken())
+
+    await bot.send("/ask как растёт жим")
+
+    assert "перегружен" not in bot.session.last_text.lower()
