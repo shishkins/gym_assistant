@@ -85,6 +85,14 @@ jobs:
 
             echo "BOT_IMAGE=ghcr.io/${{ github.repository }}-bot:sha-${{ github.sha }}" > .env.image
 
+            # The package is private by default, so the server has to
+            # authenticate to pull it. Using the job's own short-lived token
+            # rather than a personal one stored on the server: it expires with
+            # the job, and there is nothing left behind to leak.
+            echo "${{ secrets.GITHUB_TOKEN }}" \
+              | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+
             docker compose --env-file .env --env-file .env.image pull bot
 
             # Before the migration, not after: a migration that corrupts data
