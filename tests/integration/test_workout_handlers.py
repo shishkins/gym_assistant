@@ -71,7 +71,8 @@ async def test_typing_a_set_is_one_message(bot: BotHarness, session: AsyncSessio
     assert len(stored) == 1
     assert str(stored[0].weight_kg) == "80.00"
     assert stored[0].reps == 8
-    assert "80 × 8" in " ".join(bot.session.texts)
+    # The unit now travels with the number - see render.format_weight.
+    assert "80 кг × 8" in " ".join(bot.session.texts)
 
 
 async def test_repeat_costs_one_tap(bot: BotHarness, session: AsyncSession) -> None:
@@ -384,7 +385,7 @@ async def test_record_names_the_set_not_a_formula(bot: BotHarness) -> None:
 
     joined = " ".join(bot.session.texts)
     assert "Личный рекорд" in joined
-    assert "80 × 8" in joined
+    assert "80 кг × 8" in joined
 
 
 async def test_heavier_for_fewer_reps_is_a_record(bot: BotHarness) -> None:

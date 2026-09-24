@@ -155,19 +155,17 @@ PROFILE_UPDATED = "✅ Сохранил."
 # --- Weight and measurements ---------------------------------------------
 
 WEIGHT_PROMPT = "Текущий вес в килограммах?\n\nНапример: <code>82.5</code>"
-WEIGHT_PROMPT_WITH_LAST = (
-    "Текущий вес в килограммах?\n\nВ прошлый раз было <b>{last}</b> кг ({when})."
-)
+WEIGHT_PROMPT_WITH_LAST = "Текущий вес в килограммах?\n\nВ прошлый раз было <b>{last}</b> ({when})."
 
-WEIGHT_SAVED = "✅ Записал: <b>{weight}</b> кг"
-WEIGHT_SAVED_WITH_DELTA = "✅ Записал: <b>{weight}</b> кг\n\n{delta} за последний месяц"
+WEIGHT_SAVED = "✅ Записал: <b>{weight}</b>"
+WEIGHT_SAVED_WITH_DELTA = "✅ Записал: <b>{weight}</b>\n\n{delta} за последний месяц"
 
-WEIGHT_DELTA_UP = "📈 +{value} кг"
-WEIGHT_DELTA_DOWN = "📉 −{value} кг"
+WEIGHT_DELTA_UP = "📈 +{value}"
+WEIGHT_DELTA_DOWN = "📉 −{value}"
 WEIGHT_DELTA_SAME = "➡️ без изменений"
 
 PHOTO_SAVED = "📸 Сохранил фото прогресса."
-PHOTO_SAVED_WITH_WEIGHT = "📸 Сохранил фото и вес <b>{weight}</b> кг."
+PHOTO_SAVED_WITH_WEIGHT = "📸 Сохранил фото и вес <b>{weight}</b>."
 
 PHOTOS_EMPTY = (
     "Фотографий прогресса пока нет.\n\n"
@@ -176,7 +174,7 @@ PHOTOS_EMPTY = (
 )
 PHOTOS_HEADER = "📸 Фото прогресса: последние {shown} из {total}"
 PHOTO_CAPTION = "{date}"
-PHOTO_CAPTION_WITH_WEIGHT = "{date} · {weight} кг"
+PHOTO_CAPTION_WITH_WEIGHT = "{date} · {weight}"
 
 # --- Exercise catalogue ---------------------------------------------------
 
@@ -322,7 +320,7 @@ WORKOUT_STARTED = "🏋️ <b>Тренировка началась</b>\n\nВы�
 
 WORKOUT_PANEL = (
     "🏋️ <b>Тренировка идёт</b> · {duration}\n"
-    "Подходов: <b>{sets}</b> · тоннаж: <b>{tonnage}</b> кг\n\n"
+    "Подходов: <b>{sets}</b> · тоннаж: <b>{tonnage}</b>\n\n"
     "{exercises}"
 )
 WORKOUT_PANEL_EMPTY = "Пока ничего не записано."
@@ -341,21 +339,21 @@ WORKOUT_NO_FREQUENT = (
 
 WORKOUT_EXERCISE_FIRST_TIME = "<b>{name}</b>\n\n<i>Раньше не делали — записываю с нуля.</i>"
 WORKOUT_EXERCISE_HISTORY = "<b>{name}</b>\n\nВ прошлый раз ({when}):\n{sets}"
-WORKOUT_EXERCISE_BEST = "\nЛучший результат: <b>{best}</b> кг (расчётный максимум)"
+WORKOUT_EXERCISE_BEST = "\nЛучший результат: <b>{best}</b> (расчётный максимум)"
 WORKOUT_EXERCISE_TODAY = "\n\n<b>Сегодня:</b>\n{sets}"
 
 WORKOUT_SET_LINE = "  {index}. {value}"
 WORKOUT_SET_LINE_WARMUP = "  {index}. {value} · разминка"
 
-WORKOUT_ENTRY = "\n\nЗаписать: <b>{weight}</b> кг × <b>{reps}</b>"
+WORKOUT_ENTRY = "\n\nЗаписать: <b>{weight}</b> × <b>{reps}</b>"
 WORKOUT_ENTRY_BODYWEIGHT = "\n\nЗаписать: <b>{reps}</b> повторов"
 
 WORKOUT_SET_SAVED = "✅ {value}"
 WORKOUT_SETS_SAVED = "✅ {count} подхода: {value}"
 # The record is the weight on the bar, so the message shows the set.
 WORKOUT_RECORD = "🏆 <b>Личный рекорд!</b> {value}"
-WORKOUT_RECORD_BEATEN = "🏆 <b>Личный рекорд!</b> {value}\nПрежний максимум: {previous} кг"
-WORKOUT_RECORD_ESTIMATE = "\n<i>Расчётный максимум: ~{estimate} кг</i>"
+WORKOUT_RECORD_BEATEN = "🏆 <b>Личный рекорд!</b> {value}\nПрежний максимум: {previous}"
+WORKOUT_RECORD_ESTIMATE = "\n<i>Расчётный максимум: ~{estimate}</i>"
 
 WORKOUT_SET_UNDONE = "↩️ Убрал: {value}"
 WORKOUT_NOTHING_TO_UNDO = "Отменять нечего — подходов ещё нет."
@@ -380,12 +378,12 @@ WORKOUT_FINISHED = (
     "🏁 <b>Тренировка завершена</b>\n\n"
     "Длительность: <b>{duration}</b>\n"
     "Подходов: <b>{sets}</b> (рабочих {working})\n"
-    "Тоннаж: <b>{tonnage}</b> кг\n\n"
+    "Тоннаж: <b>{tonnage}</b>\n\n"
     "{exercises}"
 )
 WORKOUT_FINISHED_EMPTY = "Тренировка закрыта без записей — в историю не пойдёт."
 WORKOUT_FINISHED_RECORDS = "\n\n🏆 <b>Рекорды:</b>\n{records}"
-WORKOUT_RECORD_LINE = "  • {name} — {best} кг"
+WORKOUT_RECORD_LINE = "  • {name} — {best}"
 
 WORKOUT_LAST_NONE = "Завершённых тренировок пока нет."
 WORKOUT_LAST_HEADER = "🏁 <b>Последняя тренировка</b> · {when}\n\n"
@@ -475,8 +473,8 @@ STATS_THIN = "Пока одна точка. Со следующей тренир
 STATS_EMPTY = "За период «{period}» записей нет."
 
 STATS_RECORDS_HEADER = "🏆 <b>Личные рекорды</b>{page}\n\n"
-STATS_RECORDS_LINE = "<b>{name}</b>\n  {weight} кг × {reps} · {when}"
-STATS_RECORDS_ESTIMATE = "\n  <i>расчётный максимум {estimate} кг</i>"
+STATS_RECORDS_LINE = "<b>{name}</b>\n  {weight} × {reps} · {when}"
+STATS_RECORDS_ESTIMATE = "\n  <i>расчётный максимум {estimate}</i>"
 STATS_RECORDS_EMPTY = "Рекордов пока нет — они появятся, как только запишете подход с весом."
 
 STATS_LAST_WITH_NONE = "Завершённых тренировок с этим упражнением пока нет."
@@ -485,8 +483,8 @@ STATS_SUMMARY = (
     "📊 <b>Итоги за {period}</b>\n\n"
     "Тренировок: <b>{workouts}</b>\n"
     "Подходов: <b>{sets}</b> (рабочих {working})\n"
-    "Тоннаж: <b>{tonnage}</b> кг\n"
-    "В среднем за тренировку: <b>{per_workout}</b> кг"
+    "Тоннаж: <b>{tonnage}</b>\n"
+    "В среднем за тренировку: <b>{per_workout}</b>"
 )
 
 # --- Export ---------------------------------------------------------------
@@ -500,7 +498,7 @@ EXPORT_EMPTY = "Выгружать пока нечего — нет ни под�
 # --- Profile records ------------------------------------------------------
 
 PROFILE_RECORDS = "\n\n🏆 <b>Максимумы</b>\n{records}"
-PROFILE_RECORD_LINE = "  {name} — <b>{weight}</b> кг × {reps}"
+PROFILE_RECORD_LINE = "  {name} — <b>{weight}</b> × {reps}"
 BTN_PROFILE_RECORDS = "🏆 Все рекорды"
 
 # --- Statistics buttons ---------------------------------------------------
