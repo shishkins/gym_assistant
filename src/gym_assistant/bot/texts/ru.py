@@ -663,6 +663,16 @@ MEAL_NOT_FOOD = (
 )
 MEAL_EMPTY = "Разобрал фото, но еды на нём не нашёл. Попробуйте снимок поближе."
 MEAL_FAILED = "Не смог разобрать фото. Попробуйте ещё раз через минуту."
+# A failed clarification must not cost the breakdown that was already on
+# screen: the person asked for MORE, and ended up with less.
+MEAL_RETHINK_FAILED = (
+    "Не смог учесть подсказку — оставил разбор как был.\n\n"
+    "Можно попробовать ещё раз или записать как есть."
+)
+# Said out loud, because after the first screenshot the card came back
+# looking identical and there was no way to tell it had been read at all.
+MEAL_RETHOUGHT = "📄 Учёл подсказку — пересчитал."
+MEAL_RETHOUGHT_SAME = "📄 Подсказку учёл, но разбор не изменился."
 MEAL_EXPIRED = "Эта карточка уже неактуальна — пришлите фото заново."
 
 MEAL_DAY_EMPTY = (

@@ -42,9 +42,12 @@ log = structlog.get_logger(__name__)
 
 # Bumping this is a decision, not a tidy-up: every meal already recorded keeps
 # the version it was read with, and the two cannot be compared as one series.
-PROMPT_VERSION = "food-v3"
+PROMPT_VERSION = "food-v4"
 
-MAX_TOKENS = 2500
+# Raised from 2500 after an empty answer on a third pass: the request by
+# then carries the photo, the previous breakdown and the note, and the
+# reply ran out of room before it produced anything at all.
+MAX_TOKENS = 4000
 MAX_ITEMS = 12
 
 PROMPT = """Ты разбираешь фотографию для дневника питания.
@@ -102,6 +105,31 @@ grams_low и grams_high — не украшение и не вежливость
 словом. Если всё понятно — question пусто.
 
 Отвечай только структурой.
+"""
+
+# Appended only when a second image is attached. Without it the model has no
+# reason to treat a menu screenshot as anything but another picture of food -
+# which is exactly what it did, printed calories and all.
+SECOND_IMAGE = """
+
+ВТОРОЕ ИЗОБРАЖЕНИЕ — это подсказка от человека, а не ещё одна тарелка.
+Меню, экран доставки, этикетка или кадр с предметом для масштаба.
+
+Если на нём НАПИСАНЫ калории, вес, состав или название — бери их как
+ИСТИНУ. Напечатанная продавцом цифра всегда точнее твоей оценки по
+фотографии. Не усредняй её со своей — замени свою.
+
+Если указана калорийность блюда ЦЕЛИКОМ — подгони граммовку позиций так,
+чтобы их сумма сошлась с этой цифрой. Состав на 100 г оставь
+правдоподобным, меняй граммы.
+
+То, чего в этом блюде нет — напиток рядом, соус отдельной баночкой,
+подарок к заказу — считай отдельными позициями и в эту сумму не включай.
+
+Название блюда бери со скриншота, если оно там есть.
+
+Если на втором изображении ничего из этого нет, а есть просто предмет
+известного размера — используй его как ориентир и сузь вилку.
 """
 
 SCHEMA: dict[str, object] = {
@@ -282,7 +310,12 @@ class FoodVision:
                         "role": "user",
                         "content": [
                             *cast("Any", _images(payload, extra, media_type)),
-                            {"type": "text", "text": PROMPT + _context(hint, note, previous)},
+                            {
+                                "type": "text",
+                                "text": PROMPT
+                                + (SECOND_IMAGE if extra is not None else "")
+                                + _context(hint, note, previous),
+                            },
                         ],
                     }
                 ],
@@ -292,6 +325,14 @@ class FoodVision:
             raise VisionUnavailableError(str(exc)) from exc
 
         text = "".join(block.text for block in response.content if block.type == "text")
+        if not text.strip():
+            log.warning(
+                "vision_empty_answer",
+                stop_reason=response.stop_reason,
+                blocks=[block.type for block in response.content],
+                output_tokens=response.usage.output_tokens,
+            )
+            raise VisionUnavailableError(f"empty answer, stop_reason={response.stop_reason}")
         return self._parse(text)
 
     def _parse(self, text: str) -> Seen:

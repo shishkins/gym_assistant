@@ -360,15 +360,22 @@ async def _rethink(
             previous=[_from_data(entry) for entry in data.get("items", [])],
         )
     except VisionUnavailableError as exc:
+        # The card stays exactly as it was. Asking for help and losing the
+        # answer is the worst outcome of the three, and the state still holds
+        # a breakdown that can be saved.
         log.warning("meal_rethink_failed", reason=str(exc))
-        await notice.edit_text(ru.MEAL_FAILED)
+        await notice.edit_text(ru.MEAL_RETHINK_FAILED)
+        await state.set_state(MealFlow.reviewing)
         return
 
     if not seen.items:
-        await notice.edit_text(ru.MEAL_EMPTY)
+        await notice.edit_text(ru.MEAL_RETHINK_FAILED)
+        await state.set_state(MealFlow.reviewing)
         return
 
-    await notice.delete()
+    before = _total([_from_data(entry) for entry in data.get("items", [])], "kcal")
+    after = _total(list(seen.items), "kcal")
+    await notice.edit_text(ru.MEAL_RETHOUGHT if before != after else ru.MEAL_RETHOUGHT_SAME)
     await _show(
         message,
         state,

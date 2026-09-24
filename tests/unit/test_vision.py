@@ -15,6 +15,7 @@ from gym_assistant.ai.vision import (
     PROMPT,
     PROMPT_VERSION,
     SCHEMA,
+    SECOND_IMAGE,
     SeenItem,
     _item,
     atwater_gap_pct,
@@ -130,9 +131,22 @@ def test_atwater_catches_calories_invented_apart_from_the_macros() -> None:
 def test_the_prompt_version_travels_with_the_prompt() -> None:
     """Changing the wording without changing the version makes every meal
     already recorded incomparable with every meal after it, silently."""
-    assert PROMPT_VERSION == "food-v3"
+    assert PROMPT_VERSION == "food-v4"
     assert "ВИЛКУ ВЕСА" in PROMPT
     assert "одна еда — одна позиция" in PROMPT.lower()
+
+
+def test_a_second_image_is_explained_rather_than_shown() -> None:
+    """The bug this exists to prevent, seen for real: a delivery screenshot
+    was attached with no word about what it was, so the model read the dish
+    photographed at the top of it and ignored the "557 Kcal" printed below.
+
+    The instruction is appended only with a second image - describing one that
+    is not there would invite the model to imagine it.
+    """
+    assert "ВТОРОЕ ИЗОБРАЖЕНИЕ" not in PROMPT
+    assert "ИСТИНУ" in SECOND_IMAGE
+    assert "сумма сошлась" in SECOND_IMAGE
 
 
 def test_the_schema_demands_a_band_rather_than_a_number() -> None:
