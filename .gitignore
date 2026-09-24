@@ -49,3 +49,7 @@ models/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Фото для замеров распознавания — личные снимки, репозиторий публичный.
+food_train/
+body_progress_train/

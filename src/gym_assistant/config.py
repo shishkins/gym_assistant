@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     ai_model_main: str = "claude-opus-5"
     ai_model_fast: str = "claude-haiku-4-5"
+    # Reading a photo of a plate is extraction, not reasoning, so the cheap
+    # model was the obvious pick - and measuring said otherwise. Over nine
+    # photos, three runs each, Haiku swung 25% against Sonnet's 9% and read a
+    # legible drink label as water. Pinned rather than merely defaulted: the
+    # adaptive TDEE absorbs a steady bias and cannot absorb a moving one, so
+    # swapping this mid-history is a data decision, not a config tweak.
+    ai_model_vision: str = "claude-sonnet-5"
     ai_monthly_limit_usd: float = 10.0
 
     # --- Speech to text (iteration 6+) ---

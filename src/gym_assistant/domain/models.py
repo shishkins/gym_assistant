@@ -121,6 +121,19 @@ class Role(StrEnum):
     ADMIN = "admin"
 
 
+class GramsSource(StrEnum):
+    """Who decided the portion.
+
+    Worth a column of its own: a portion the person corrected by hand is the
+    only honest reading we ever get. Collected over a month they are what
+    finally measure the model's drift - running the same photo twice measures
+    only whether it agrees with itself.
+    """
+
+    MODEL = "model"
+    USER = "user"
+
+
 ROLE_RANK = {role: index for index, role in enumerate(Role)}
 
 
@@ -655,3 +668,102 @@ class AiUsage(Base):
 
     def __repr__(self) -> str:
         return f"<AiUsage id={self.id} model={self.model} cost={self.cost_usd}>"
+
+
+class Meal(Base, TimestampMixin):
+    """One eating occasion, as a photo turned into numbers.
+
+    Written only after the person confirms it. An unconfirmed breakdown lives
+    in the dialogue state and never reaches this table - a diary that fills up
+    with guesses nobody agreed to is worse than an empty one.
+    """
+
+    __tablename__ = "meals"
+    __table_args__ = (
+        Index("ix_meals_user_eaten", "user_id", "eaten_at"),
+        CheckConstraint("kcal >= 0 AND kcal <= 20000", name="ck_meals_kcal"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    eaten_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    photo_file_id: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+
+    # Summed from the items when they are written. Every report adds these up;
+    # joining to recompute them on each chart buys nothing.
+    kcal: Mapped[Decimal] = mapped_column(Numeric(7, 1), nullable=False, server_default="0")
+    protein_g: Mapped[Decimal] = mapped_column(Numeric(6, 1), nullable=False, server_default="0")
+    fat_g: Mapped[Decimal] = mapped_column(Numeric(6, 1), nullable=False, server_default="0")
+    carb_g: Mapped[Decimal] = mapped_column(Numeric(6, 1), nullable=False, server_default="0")
+
+    # Which model and which prompt read the photo. A change in either shifts
+    # the bias, and a bias that moves is the one thing the adaptive TDEE
+    # cannot absorb - so the history has to say where the seam is.
+    model: Mapped[str | None] = mapped_column(Text)
+    prompt_version: Mapped[str | None] = mapped_column(Text)
+
+    items: Mapped[list[MealItem]] = relationship(
+        back_populates="meal",
+        cascade="all, delete-orphan",
+        order_by="MealItem.order_index",
+        lazy="selectin",
+    )
+
+    def __repr__(self) -> str:
+        return f"<Meal id={self.id} kcal={self.kcal}>"
+
+
+class MealItem(Base, TimestampMixin):
+    """One thing on the plate.
+
+    ``kcal_100g`` and the macros are a SNAPSHOT, not a reference. A meal
+    recorded a month ago has to read as what it was recorded as, whatever has
+    been learned about that food since.
+    """
+
+    __tablename__ = "meal_items"
+    __table_args__ = (
+        Index("ix_meal_items_meal", "meal_id", "order_index"),
+        CheckConstraint("grams > 0 AND grams <= 5000", name="ck_meal_items_grams"),
+        CheckConstraint("kcal_100g >= 0 AND kcal_100g <= 900", name="ck_meal_items_kcal"),
+        CheckConstraint(
+            _enum_check("grams_source", GramsSource), name="ck_meal_items_grams_source"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    meal_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("meals.id", ondelete="CASCADE"), nullable=False
+    )
+    order_index: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # The band, not just the point. Measured: the model judges the WIDTH of its
+    # own uncertainty about right, while the centre drifts between identical
+    # photos. So the centre is what gets shown and the width is what decides
+    # whether to ask.
+    grams: Mapped[Decimal] = mapped_column(Numeric(7, 1), nullable=False)
+    grams_low: Mapped[Decimal | None] = mapped_column(Numeric(7, 1))
+    grams_high: Mapped[Decimal | None] = mapped_column(Numeric(7, 1))
+
+    kcal_100g: Mapped[Decimal] = mapped_column(Numeric(6, 1), nullable=False)
+    protein_100g: Mapped[Decimal] = mapped_column(Numeric(5, 1), nullable=False)
+    fat_100g: Mapped[Decimal] = mapped_column(Numeric(5, 1), nullable=False)
+    carb_100g: Mapped[Decimal] = mapped_column(Numeric(5, 1), nullable=False)
+
+    # A portion the person corrected is a calibration point: collected over a
+    # month, these are what finally show how far the model actually drifts -
+    # which no amount of running the same photo twice can tell us.
+    grams_source: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=GramsSource.MODEL.value
+    )
+
+    meal: Mapped[Meal] = relationship(back_populates="items")
+
+    def __repr__(self) -> str:
+        return f"<MealItem id={self.id} name={self.name!r} grams={self.grams}>"
