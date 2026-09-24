@@ -131,7 +131,7 @@ def test_atwater_catches_calories_invented_apart_from_the_macros() -> None:
 def test_the_prompt_version_travels_with_the_prompt() -> None:
     """Changing the wording without changing the version makes every meal
     already recorded incomparable with every meal after it, silently."""
-    assert PROMPT_VERSION == "food-v4"
+    assert PROMPT_VERSION == "food-v5"
     assert "ВИЛКУ ВЕСА" in PROMPT
     assert "одна еда — одна позиция" in PROMPT.lower()
 
@@ -146,7 +146,11 @@ def test_a_second_image_is_explained_rather_than_shown() -> None:
     """
     assert "ВТОРОЕ ИЗОБРАЖЕНИЕ" not in PROMPT
     assert "ИСТИНУ" in SECOND_IMAGE
-    assert "сумма сошлась" in SECOND_IMAGE
+    # Seen for real on the second attempt: the stated 557 kcal was taken for
+    # the bowl, and then the dressing that those 557 already covered was added
+    # on top as its own row. The total went UP after a clarification.
+    assert "двойной счёт" in SECOND_IMAGE
+    assert "ЦЕЛИКОМ" in SECOND_IMAGE
 
 
 def test_the_schema_demands_a_band_rather_than_a_number() -> None:
