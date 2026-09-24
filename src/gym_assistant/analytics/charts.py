@@ -33,7 +33,6 @@ from gym_assistant.analytics.style import (
     POSITIVE,
     new_figure,
 )
-from gym_assistant.domain.units import Units, from_kg, label
 
 # Nothing at all is the only case worth refusing. A single point is a poor
 # trend but an honest picture, and refusing it means a new user sees the words
@@ -56,23 +55,11 @@ def _to_png(figure: Figure) -> bytes:
     return buffer.getvalue()
 
 
-def _axis(value: Decimal | None, units: Units) -> float:
-    """A stored weight as a point on the axis, in the reader's own system.
-
-    Converting the label alone would be worse than leaving it in kilograms:
-    the numbers on the axis are the chart, and a kilogram curve under a
-    "lbs" label is a wrong answer rather than an untranslated one.
-    """
-    return np.nan if value is None else float(from_kg(value, units))
-
-
 def _format_dates(axes: Axes) -> None:
     axes.xaxis.set_major_formatter(DateFormatter("%d.%m"))
 
 
-def exercise_progress_chart(
-    name: str, points: Sequence[ProgressPoint], units: Units = Units.METRIC
-) -> bytes | None:
+def exercise_progress_chart(name: str, points: Sequence[ProgressPoint]) -> bytes | None:
     """Working weight and estimated maximum over time, with a trend line."""
     if len(points) < MIN_POINTS:
         return None
@@ -80,8 +67,8 @@ def exercise_progress_chart(
     # date2num rather than raw dates: matplotlib accepts both at runtime, but
     # only the numeric form is typed, and the axis formatter reads it the same.
     days = date2num([point.at for point in points])
-    weights = [_axis(point.best_weight, units) for point in points]
-    estimates = [_axis(point.best_estimate, units) for point in points]
+    weights = [float(point.best_weight) if point.best_weight else np.nan for point in points]
+    estimates = [float(point.best_estimate) if point.best_estimate else np.nan for point in points]
 
     figure, axes = new_figure(f"Динамика: {name}")
     axes.plot(days, weights, marker="o", color=ACCENT, label="Рабочий вес", linewidth=2)
@@ -104,26 +91,24 @@ def exercise_progress_chart(
         trend = slope * np.arange(len(days)) + intercept
         axes.plot(days, trend, color=POSITIVE, linestyle="--", linewidth=1.4, label="Тренд")
 
-    axes.set_ylabel(label(units))
+    axes.set_ylabel("кг")
     axes.legend(loc="upper left")
     _format_dates(axes)
     figure.autofmt_xdate(rotation=0, ha="center")
     return _to_png(figure)
 
 
-def weekly_tonnage_chart(
-    weeks: Sequence[tuple[date, Decimal]], units: Units = Units.METRIC
-) -> bytes | None:
+def weekly_tonnage_chart(weeks: Sequence[tuple[date, Decimal]]) -> bytes | None:
     """Total weight moved per week."""
     if len(weeks) < MIN_POINTS:
         return None
 
     labels = [day.strftime("%d.%m") for day, _ in weeks]
-    values = [_axis(value, units) for _, value in weeks]
+    values = [float(value) for _, value in weeks]
 
     figure, axes = new_figure("Тоннаж по неделям")
     axes.bar(labels, values, color=ACCENT, width=0.6)
-    axes.set_ylabel(f"{label(units)} за неделю")
+    axes.set_ylabel("кг за неделю")
     axes.tick_params(axis="x", rotation=45)
 
     # An average drawn through a single bar is the bar again, labelled twice.
@@ -192,9 +177,7 @@ def muscle_volume_chart(volume: dict[date, dict[str, float]]) -> bytes | None:
 
 
 def body_weight_chart(
-    points: Sequence[tuple[date, Decimal]],
-    smoothed: Sequence[tuple[date, Decimal]],
-    units: Units = Units.METRIC,
+    points: Sequence[tuple[date, Decimal]], smoothed: Sequence[tuple[date, Decimal]]
 ) -> bytes | None:
     """Weigh-ins with a trailing average over them."""
     if len(points) < MIN_POINTS:
@@ -203,7 +186,7 @@ def body_weight_chart(
     figure, axes = new_figure("Вес тела")
     axes.plot(
         date2num([day for day, _ in points]),
-        [_axis(value, units) for _, value in points],
+        [float(value) for _, value in points],
         marker="o",
         markersize=4,
         linestyle="none",
@@ -212,12 +195,12 @@ def body_weight_chart(
     )
     axes.plot(
         date2num([day for day, _ in smoothed]),
-        [_axis(value, units) for _, value in smoothed],
+        [float(value) for _, value in smoothed],
         color=ACCENT,
         linewidth=2,
         label="Среднее за 7 дней",
     )
-    axes.set_ylabel(label(units))
+    axes.set_ylabel("кг")
     axes.legend(loc="upper left")
     _format_dates(axes)
     figure.autofmt_xdate(rotation=0, ha="center")

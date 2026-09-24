@@ -35,8 +35,6 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from gym_assistant.domain.units import Units
-
 
 class Base(DeclarativeBase):
     """Declarative base for every ORM model."""
@@ -142,18 +140,11 @@ def _enum_check(column: str, enum: type[StrEnum]) -> str:
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("units IN ('metric', 'imperial')", name="ck_users_units"),)
-
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False, index=True)
     username: Mapped[str | None] = mapped_column(Text)
     first_name: Mapped[str | None] = mapped_column(Text)
     locale: Mapped[str] = mapped_column(String(8), nullable=False, server_default="ru")
-    # A display preference, like locale - not a body attribute, so it lives
-    # here and not on the profile. Storage stays kilograms either way.
-    units: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default=Units.METRIC.value
-    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
 
     profile: Mapped[UserProfile | None] = relationship(
@@ -177,16 +168,6 @@ class User(Base, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="raise",
     )
-
-    @property
-    def unit_system(self) -> Units:
-        """``units``, typed.
-
-        The column is a plain string so the CHECK constraint can police it in
-        SQL, but every reader wants the enum - and a bare ``Units(user.units)``
-        at two dozen call sites is two dozen places to get the cast wrong.
-        """
-        return Units(self.units)
 
     def __repr__(self) -> str:
         return f"<User id={self.id} telegram_id={self.telegram_id}>"

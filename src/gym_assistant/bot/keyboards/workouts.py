@@ -14,7 +14,10 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from gym_assistant.bot.texts import ru
 from gym_assistant.domain.models import Exercise
-from gym_assistant.domain.units import WEIGHT_STEPS, Units
+
+# Plate maths, not round numbers: 2.5 kg is the smallest pair of plates in
+# most gyms, 5 kg the next step up.
+WEIGHT_STEPS = (Decimal("-5"), Decimal("-2.5"), Decimal("2.5"), Decimal("5"))
 
 
 class WorkoutCB(CallbackData, prefix="wo"):
@@ -142,14 +145,8 @@ def set_entry_keyboard(
     reps: int,
     can_repeat: bool,
     is_favourite: bool = False,
-    units: Units = Units.METRIC,
 ) -> InlineKeyboardMarkup:
-    """Prefilled set with nudges. Committing it is one tap from here.
-
-    ``delta`` travels in the user's own units, not in kilograms: the label on
-    the button and the number in the payload have to be the same thing, or a
-    "+5" would move the bar by 2.27 of something.
-    """
+    """Prefilled set with nudges. Committing it is one tap from here."""
     builder = InlineKeyboardBuilder()
 
     if weight is not None:
@@ -159,7 +156,7 @@ def set_entry_keyboard(
                     text=f"{step:+g}",
                     callback_data=SetAdjustCB(field="weight", delta=str(step)).pack(),
                 )
-                for step in WEIGHT_STEPS[units]
+                for step in WEIGHT_STEPS
             ]
         )
 

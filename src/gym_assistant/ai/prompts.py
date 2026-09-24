@@ -9,8 +9,6 @@ first user message instead.
 
 from __future__ import annotations
 
-from gym_assistant.domain.units import Units
-
 SYSTEM_PROMPT = """\
 Ты — ассистент внутри телеграм-бота, который ведёт дневник тренировок в зале.
 Отвечаешь по-русски, на «вы» не переходишь — обращайся на «ты».
@@ -67,23 +65,11 @@ SYSTEM_PROMPT = """\
 """
 
 
-def brief(first_name: str | None, units: Units = Units.METRIC) -> str:
+def brief(first_name: str | None) -> str:
     """The per-user line, kept OUT of the cached system prefix.
 
     Only what changes between people goes here; everything stable lives in
     SYSTEM_PROMPT so the cache keeps hitting.
-
-    The units line is a label, not a conversion instruction: the tools already
-    hand over converted numbers under ``*_lbs`` keys. Asking the model to do
-    the arithmetic itself would put a division in the one place we cannot test.
     """
-    parts = []
     name = (first_name or "").strip()
-    if name:
-        parts.append(f"Пользователя зовут {name}.")
-    if units is Units.IMPERIAL:
-        parts.append(
-            "Он считает вес в фунтах: инструменты отдают числа уже в фунтах, "
-            "ключи заканчиваются на _lbs. Пиши lbs, не пересчитывай сам."
-        )
-    return " ".join(parts)
+    return f"Пользователя зовут {name}." if name else ""

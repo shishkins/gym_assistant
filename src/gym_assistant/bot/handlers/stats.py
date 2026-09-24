@@ -194,7 +194,7 @@ async def report(
             weeks = await stats.weekly_tonnage(user.id, since=since)
             await _send(
                 message,
-                charts.weekly_tonnage_chart(weeks, user.unit_system),
+                charts.weekly_tonnage_chart(weeks),
                 "tonnage",
                 period,
                 empty=ru.STATS_NOT_ENOUGH.format(period=label),
@@ -224,7 +224,7 @@ async def report(
             ]
             await _send(
                 message,
-                charts.body_weight_chart(points, moving_average(points), user.unit_system),
+                charts.body_weight_chart(points, moving_average(points)),
                 "weight",
                 period,
                 empty=ru.STATS_NOT_ENOUGH.format(period=label),
@@ -277,7 +277,7 @@ async def exercise_progress(
     points = compute_progress(sets)
     await _send(
         message,
-        charts.exercise_progress_chart(exercise.name_ru, points, user.unit_system),
+        charts.exercise_progress_chart(exercise.name_ru, points),
         "progress",
         period,
         empty=ru.STATS_NOT_ENOUGH.format(period=ru.STATS_PERIOD_LABELS[period]),
@@ -310,10 +310,7 @@ async def last_with_exercise(
         return
 
     header = ru.WORKOUT_LAST_HEADER.format(when=render.format_when(summary.workout.started_at))
-    await message.answer(
-        header + render.render_workout_summary(summary, user.unit_system),
-        reply_markup=keyboard,
-    )
+    await message.answer(header + render.render_workout_summary(summary), reply_markup=keyboard)
 
 
 # --- text reports ---------------------------------------------------------
@@ -334,18 +331,17 @@ async def _records(
     page = min(max(page, 0), total_pages - 1)
     offset = page * RECORDS_PAGE_SIZE
 
-    units = user.unit_system
     lines = []
     for record in records[offset : offset + RECORDS_PAGE_SIZE]:
         line = ru.STATS_RECORDS_LINE.format(
             name=record.exercise_name,
-            weight=(render.format_weight(record.best_weight, units) if record.best_weight else "—"),
+            weight=render.format_weight(record.best_weight) if record.best_weight else "—",
             reps=record.best_weight_reps or "—",
             when=render.format_when(record.best_weight_at) if record.best_weight_at else "",
         )
         if record.best_estimate is not None:
             line += ru.STATS_RECORDS_ESTIMATE.format(
-                estimate=render.format_weight(record.best_estimate, units)
+                estimate=render.format_weight(record.best_estimate)
             )
         lines.append(line)
 
@@ -377,8 +373,8 @@ async def _summary(message: Message, session: AsyncSession, user: User, period: 
             workouts=len(days),
             sets=len(sets),
             working=len(working_sets(sets)),
-            tonnage=render.format_weight(tonnage.quantize(Decimal("1")), user.unit_system),
-            per_workout=render.format_weight(per_workout.quantize(Decimal("1")), user.unit_system),
+            tonnage=render.format_weight(tonnage.quantize(Decimal("1"))),
+            per_workout=render.format_weight(per_workout.quantize(Decimal("1"))),
         ),
         reply_markup=report_keyboard("summary", period),
     )
@@ -395,15 +391,14 @@ async def _export(message: Message, session: AsyncSession, user: User) -> None:
 
     await message.answer(ru.EXPORT_READY.format(sets=len(sets), measurements=len(measurements)))
     stamp = datetime.now(UTC).date().isoformat()
-    units = user.unit_system
     if sets:
         await message.answer_document(
-            BufferedInputFile(export.sets_to_csv(sets, units), filename=f"подходы_{stamp}.csv")
+            BufferedInputFile(export.sets_to_csv(sets), filename=f"подходы_{stamp}.csv")
         )
     if measurements:
         await message.answer_document(
             BufferedInputFile(
-                export.measurements_to_csv(list(reversed(measurements)), units),
+                export.measurements_to_csv(list(reversed(measurements))),
                 filename=f"замеры_{stamp}.csv",
             )
         )

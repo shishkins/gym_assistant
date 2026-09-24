@@ -10,43 +10,37 @@ from __future__ import annotations
 import csv
 import io
 from collections.abc import Sequence
-from decimal import Decimal
 
 from gym_assistant.domain.models import BodyMeasurement, WorkoutSet
-from gym_assistant.domain.units import Units, from_kg, label
 
 BOM = "﻿"
 DELIMITER = ";"
 
+SET_COLUMNS = (
+    "дата",
+    "время",
+    "упражнение",
+    "группа_мышц",
+    "подход",
+    "вес_кг",
+    "повторы",
+    "время_сек",
+    "дистанция_м",
+    "rpe",
+    "разминка",
+)
 
-def set_columns(units: Units = Units.METRIC) -> tuple[str, ...]:
-    return (
-        "дата",
-        "время",
-        "упражнение",
-        "группа_мышц",
-        "подход",
-        f"вес_{label(units)}",
-        "повторы",
-        "время_сек",
-        "дистанция_м",
-        "rpe",
-        "разминка",
-    )
-
-
-def measurement_columns(units: Units = Units.METRIC) -> tuple[str, ...]:
-    return (
-        "дата",
-        f"вес_{label(units)}",
-        "жир_процент",
-        "грудь_см",
-        "талия_см",
-        "бёдра_см",
-        "бицепс_см",
-        "бедро_см",
-        "заметка",
-    )
+MEASUREMENT_COLUMNS = (
+    "дата",
+    "вес_кг",
+    "жир_процент",
+    "грудь_см",
+    "талия_см",
+    "бёдра_см",
+    "бицепс_см",
+    "бедро_см",
+    "заметка",
+)
 
 
 def _write(columns: Sequence[str], rows: Sequence[Sequence[object]]) -> bytes:
@@ -58,11 +52,7 @@ def _write(columns: Sequence[str], rows: Sequence[Sequence[object]]) -> bytes:
     return (BOM + buffer.getvalue()).encode("utf-8")
 
 
-def _weight(value: Decimal | None, units: Units) -> Decimal | None:
-    return None if value is None else from_kg(value, units)
-
-
-def sets_to_csv(sets: Sequence[WorkoutSet], units: Units = Units.METRIC) -> bytes:
+def sets_to_csv(sets: Sequence[WorkoutSet]) -> bytes:
     rows = [
         (
             item.performed_at.date().isoformat(),
@@ -70,7 +60,7 @@ def sets_to_csv(sets: Sequence[WorkoutSet], units: Units = Units.METRIC) -> byte
             item.exercise.name_ru if item.exercise else "",
             item.exercise.primary_muscle_group.name_ru if item.exercise else "",
             item.set_index,
-            _weight(item.weight_kg, units),
+            item.weight_kg,
             item.reps,
             item.duration_sec,
             item.distance_m,
@@ -79,16 +69,14 @@ def sets_to_csv(sets: Sequence[WorkoutSet], units: Units = Units.METRIC) -> byte
         )
         for item in sets
     ]
-    return _write(set_columns(units), rows)
+    return _write(SET_COLUMNS, rows)
 
 
-def measurements_to_csv(
-    measurements: Sequence[BodyMeasurement], units: Units = Units.METRIC
-) -> bytes:
+def measurements_to_csv(measurements: Sequence[BodyMeasurement]) -> bytes:
     rows = [
         (
             item.measured_at.date().isoformat(),
-            _weight(item.weight_kg, units),
+            item.weight_kg,
             item.body_fat_pct,
             item.chest_cm,
             item.waist_cm,
@@ -99,4 +87,4 @@ def measurements_to_csv(
         )
         for item in measurements
     ]
-    return _write(measurement_columns(units), rows)
+    return _write(MEASUREMENT_COLUMNS, rows)

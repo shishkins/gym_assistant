@@ -105,7 +105,7 @@ ONBOARDING_BIRTH_DATE = (
 ONBOARDING_HEIGHT = "Рост в сантиметрах?\n\nНапример: <code>178</code>"
 ONBOARDING_GOAL = "Какая цель сейчас в приоритете?"
 ONBOARDING_WEIGHT = (
-    "Текущий вес в {unit}?\n\nНапример: <code>{example}</code>\n\n"
+    "Текущий вес в килограммах?\n\nНапример: <code>82.5</code>\n\n"
     "<i>Вес я храню историей, так что дальше можно взвешиваться командой /weight.</i>"
 )
 
@@ -129,8 +129,8 @@ ERROR_DATE_RANGE = (
 )
 ERROR_HEIGHT_FORMAT = "Нужно число, например <code>178</code>."
 ERROR_HEIGHT_RANGE = "Рост должен быть от 100 до 250 см."
-ERROR_WEIGHT_FORMAT = "Нужно число, например <code>{example}</code>."
-ERROR_WEIGHT_RANGE = "Вес должен быть от {min} до {max} {unit}."
+ERROR_WEIGHT_FORMAT = "Нужно число, например <code>82.5</code>."
+ERROR_WEIGHT_RANGE = "Вес должен быть от 20 до 400 кг."
 
 # --- Profile --------------------------------------------------------------
 
@@ -152,24 +152,10 @@ PROFILE_FIELD_PROMPTS = {
 
 PROFILE_UPDATED = "✅ Сохранил."
 
-PROFILE_UNITS = "Единицы: <b>{unit}</b>"
-# The button names where you are going, not where you are: a toggle labelled
-# with the current state reads as a statement and gets tapped by mistake.
-BTN_UNITS_SWITCH = "⚖️ Перейти на {unit}"
-UNITS_SWITCHED = (
-    "Теперь вес в <b>{unit}</b>.\n\n"
-    "<i>В базе всё хранится как раньше — переключатель меняет только показ "
-    "и то, в чём вы вводите числа. История пересчитана вся, задним числом.</i>"
-)
-
 # --- Weight and measurements ---------------------------------------------
 
-# An example has to be plausible in its own system: "82.5" under a pounds
-# label reads as a bug rather than as a hint.
-WEIGHT_EXAMPLES = {"metric": "82.5", "imperial": "180"}
-
-WEIGHT_PROMPT = "Текущий вес в {unit}?\n\nНапример: <code>{example}</code>"
-WEIGHT_PROMPT_WITH_LAST = "Текущий вес в {unit}?\n\nВ прошлый раз было <b>{last}</b> ({when})."
+WEIGHT_PROMPT = "Текущий вес в килограммах?\n\nНапример: <code>82.5</code>"
+WEIGHT_PROMPT_WITH_LAST = "Текущий вес в килограммах?\n\nВ прошлый раз было <b>{last}</b> ({when})."
 
 WEIGHT_SAVED = "✅ Записал: <b>{weight}</b>"
 WEIGHT_SAVED_WITH_DELTA = "✅ Записал: <b>{weight}</b>\n\n{delta} за последний месяц"

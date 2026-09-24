@@ -28,7 +28,6 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from gym_assistant.domain.parsing.values import ValueParseError
-from gym_assistant.domain.units import Units, to_kg
 
 MAX_REPEAT = 20
 
@@ -70,14 +69,8 @@ class ParsedSet:
         return any((self.reps, self.duration_sec, self.distance_m))
 
 
-def parse_set_entry(raw: str, units: Units = Units.METRIC) -> ParsedSet:
-    """Reads one line into a set, or raises :class:`ValueParseError`.
-
-    ``units`` is what the number means, not what comes back: the weight is
-    converted here, so ``ParsedSet.weight_kg`` is kilograms whatever was
-    typed. Only the grammar is unit-agnostic - "225x5" parses identically in
-    both systems, and the setting decides whether 225 is kilos or pounds.
-    """
+def parse_set_entry(raw: str) -> ParsedSet:
+    """Reads one line into a set, or raises :class:`ValueParseError`."""
     text = " ".join(raw.strip().lower().replace(",", ".").split())
     if not text:
         raise ValueParseError("format")
@@ -95,7 +88,7 @@ def parse_set_entry(raw: str, units: Units = Units.METRIC) -> ParsedSet:
 
     parsed = _parse_numbers(text)
     return ParsedSet(
-        weight_kg=None if parsed.weight is None else to_kg(parsed.weight, units),
+        weight_kg=parsed.weight_kg,
         reps=parsed.reps,
         duration_sec=parsed.duration_sec,
         distance_m=parsed.distance_m,
@@ -156,9 +149,7 @@ def _split_exercise(text: str) -> tuple[str | None, str]:
 
 @dataclass(frozen=True, slots=True)
 class _Numbers:
-    """What the digits said. ``weight`` is still in whatever the user types."""
-
-    weight: Decimal | None = None
+    weight_kg: Decimal | None = None
     reps: int | None = None
     duration_sec: int | None = None
     distance_m: int | None = None
@@ -190,10 +181,10 @@ def _parse_numbers(text: str) -> _Numbers:
     if len(values) == 1:
         return _Numbers(reps=_as_reps(values[0]))
     if len(values) == 2:
-        return _Numbers(weight=_as_weight(values[0]), reps=_as_reps(values[1]))
+        return _Numbers(weight_kg=_as_weight(values[0]), reps=_as_reps(values[1]))
     if len(values) == 3:
         return _Numbers(
-            weight=_as_weight(values[0]),
+            weight_kg=_as_weight(values[0]),
             reps=_as_reps(values[1]),
             repeat=_as_repeat(values[2]),
         )

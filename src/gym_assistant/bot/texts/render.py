@@ -10,7 +10,6 @@ from urllib.parse import quote_plus
 from gym_assistant.bot.texts import ru
 from gym_assistant.domain.models import Equipment, Exercise, ExerciseType, WorkoutSet
 from gym_assistant.domain.services import ExerciseHistory, ProfileSummary, WorkoutSummary
-from gym_assistant.domain.units import Units, from_kg, label, weight_bounds
 
 
 def format_decimal(value: Decimal) -> str:
@@ -25,46 +24,20 @@ def format_decimal(value: Decimal) -> str:
     return text or "0"
 
 
-def format_weight(kg: Decimal, units: Units = Units.METRIC) -> str:
-    """Stored kilograms, shown in the user's own system, WITH the unit.
+def format_weight(kg: Decimal) -> str:
+    """A stored weight, with its unit.
 
-    The unit rides along with the number on purpose. The alternative - a
-    bare number plus " кг" spelled out in twenty templates - means twenty
-    places to pass a parameter to and one of them forgotten. Here there is
-    one place, and a caller that forgets ``units`` shows kilos rather than
-    the wrong number under the wrong label.
+    The bot shows kilograms and only kilograms; pounds exist as a way to type
+    a number, never as a way to read one. The unit rides along with the number
+    from here rather than being spelled out in twenty templates - twenty
+    places to keep in step, one of which drifts.
     """
-    return f"{format_decimal(from_kg(kg, units))} {label(units)}"
+    return f"{format_decimal(kg)} кг"
 
 
-def weight_error(reason: str, units: Units) -> str:
-    """The parser's ``reason`` as a sentence, in the units it was typed in.
-
-    Both messages quote numbers - an example and a range - and both of those
-    numbers are wrong in the other system. This lived as an inline ternary in
-    four handlers; that is four places to quote kilograms at someone who
-    types pounds.
-    """
-    if reason == "format":
-        return ru.ERROR_WEIGHT_FORMAT.format(example=ru.WEIGHT_EXAMPLES[units.value])
-    low, high = weight_bounds(units)
-    return ru.ERROR_WEIGHT_RANGE.format(
-        min=format_decimal(low), max=format_decimal(high), unit=label(units)
-    )
-
-
-def weight_prompt(units: Units) -> str:
-    return ru.WEIGHT_PROMPT.format(unit=label(units), example=ru.WEIGHT_EXAMPLES[units.value])
-
-
-def weight_prompt_with_last(last: Decimal, when: datetime, units: Units) -> str:
-    return ru.WEIGHT_PROMPT_WITH_LAST.format(
-        unit=label(units), last=format_weight(last, units), when=format_when(when)
-    )
-
-
-def onboarding_weight_prompt(units: Units) -> str:
-    return ru.ONBOARDING_WEIGHT.format(unit=label(units), example=ru.WEIGHT_EXAMPLES[units.value])
+def weight_error(reason: str) -> str:
+    """The parser's ``reason`` as a sentence."""
+    return ru.ERROR_WEIGHT_FORMAT if reason == "format" else ru.ERROR_WEIGHT_RANGE
 
 
 def format_date(value: date) -> str:
@@ -89,15 +62,9 @@ def format_when(moment: datetime, *, now: datetime | None = None) -> str:
     return format_date(moment.date())
 
 
-def _units_line(units: Units) -> str:
-    return ru.PROFILE_UNITS.format(unit=label(units))
-
-
-def render_profile(summary: ProfileSummary, units: Units = Units.METRIC) -> str:
+def render_profile(summary: ProfileSummary) -> str:
     if summary.is_empty:
-        # The units line belongs here too: it is the one setting that works
-        # with no profile at all, and the card carries the button for it.
-        return ru.PROFILE_EMPTY + "\n\n" + _units_line(units)
+        return ru.PROFILE_EMPTY
 
     lines = [ru.PROFILE_HEADER]
 
@@ -109,7 +76,7 @@ def render_profile(summary: ProfileSummary, units: Units = Units.METRIC) -> str:
 
     if summary.weight_kg is not None:
         when = format_when(summary.weight_measured_at) if summary.weight_measured_at else ""
-        lines.append(f"\nВес: <b>{format_weight(summary.weight_kg, units)}</b> ({when})")
+        lines.append(f"\nВес: <b>{format_weight(summary.weight_kg)}</b> ({when})")
 
     if summary.bmi is not None and summary.bmi_band is not None:
         band = ru.BMI_LABELS[summary.bmi_band]
@@ -124,18 +91,14 @@ def render_profile(summary: ProfileSummary, units: Units = Units.METRIC) -> str:
     if summary.measurements_count:
         lines.append(f"\nЗамеров в истории: {summary.measurements_count}")
 
-    # Shown in metric too: without it the switch button has nothing to switch
-    # away from, and a stray tap becomes unexplainable.
-    lines.append("\n" + _units_line(units))
-
     return "\n".join(lines)
 
 
-def render_profile_summary_short(summary: ProfileSummary, units: Units = Units.METRIC) -> str:
+def render_profile_summary_short(summary: ProfileSummary) -> str:
     """One-liner for the greeting of a returning user."""
     parts: list[str] = []
     if summary.weight_kg is not None:
-        parts.append(f"вес {format_weight(summary.weight_kg, units)}")
+        parts.append(f"вес {format_weight(summary.weight_kg)}")
     if summary.goal is not None:
         parts.append(ru.GOAL_LABELS[summary.goal].lower())
     if not parts:
@@ -216,10 +179,10 @@ def format_seconds(seconds: int) -> str:
     return f"{minutes}:{rest:02d}" if minutes else f"{rest} с"
 
 
-def render_set_value(item: WorkoutSet, units: Units = Units.METRIC) -> str:
+def render_set_value(item: WorkoutSet) -> str:
     """One set as a person reads it, not as the schema stores it."""
     if item.weight_kg is not None and item.reps is not None:
-        value = f"{format_weight(item.weight_kg, units)} × {item.reps}"
+        value = f"{format_weight(item.weight_kg)} × {item.reps}"
     elif item.reps is not None:
         value = f"{item.reps} повт."
     elif item.duration_sec is not None:
@@ -234,11 +197,11 @@ def render_set_value(item: WorkoutSet, units: Units = Units.METRIC) -> str:
     return value
 
 
-def render_set_lines(sets: Sequence[WorkoutSet], units: Units = Units.METRIC) -> str:
+def render_set_lines(sets: Sequence[WorkoutSet]) -> str:
     lines = []
     for index, item in enumerate(sets, start=1):
         template = ru.WORKOUT_SET_LINE_WARMUP if item.is_warmup else ru.WORKOUT_SET_LINE
-        lines.append(template.format(index=index, value=render_set_value(item, units)))
+        lines.append(template.format(index=index, value=render_set_value(item)))
     return "\n".join(lines)
 
 
@@ -248,7 +211,6 @@ def render_workout_panel(
     sets: Sequence[WorkoutSet],
     tonnage: Decimal,
     by_exercise: Sequence[tuple[Exercise, list[WorkoutSet]]],
-    units: Units = Units.METRIC,
 ) -> str:
     if not sets:
         body = ru.WORKOUT_PANEL_EMPTY
@@ -256,14 +218,14 @@ def render_workout_panel(
         body = "\n".join(
             ru.WORKOUT_PANEL_LINE.format(
                 name=exercise.name_ru,
-                sets=", ".join(render_set_value(item, units) for item in items),
+                sets=", ".join(render_set_value(item) for item in items),
             )
             for exercise, items in by_exercise
         )
     return ru.WORKOUT_PANEL.format(
         duration=format_duration(duration_min),
         sets=len(sets),
-        tonnage=format_weight(tonnage, units),
+        tonnage=format_weight(tonnage),
         exercises=body,
     )
 
@@ -274,7 +236,6 @@ def render_exercise_panel(
     *,
     weight: Decimal | None,
     reps: int,
-    units: Units = Units.METRIC,
 ) -> str:
     if history.is_first_time:
         text = ru.WORKOUT_EXERCISE_FIRST_TIME.format(name=history.exercise.name_ru)
@@ -282,31 +243,29 @@ def render_exercise_panel(
         text = ru.WORKOUT_EXERCISE_HISTORY.format(
             name=history.exercise.name_ru,
             when=format_when(history.last_performed_at) if history.last_performed_at else "",
-            sets=render_set_lines(history.last_sets, units),
+            sets=render_set_lines(history.last_sets),
         )
         if history.best_estimate is not None:
-            text += ru.WORKOUT_EXERCISE_BEST.format(
-                best=format_weight(history.best_estimate, units)
-            )
+            text += ru.WORKOUT_EXERCISE_BEST.format(best=format_weight(history.best_estimate))
 
     if today:
-        text += ru.WORKOUT_EXERCISE_TODAY.format(sets=render_set_lines(today, units))
+        text += ru.WORKOUT_EXERCISE_TODAY.format(sets=render_set_lines(today))
 
     if weight is not None:
-        text += ru.WORKOUT_ENTRY.format(weight=format_weight(weight, units), reps=reps)
+        text += ru.WORKOUT_ENTRY.format(weight=format_weight(weight), reps=reps)
     else:
         text += ru.WORKOUT_ENTRY_BODYWEIGHT.format(reps=reps)
     return text
 
 
-def render_workout_summary(summary: WorkoutSummary, units: Units = Units.METRIC) -> str:
+def render_workout_summary(summary: WorkoutSummary) -> str:
     if summary.is_empty:
         return ru.WORKOUT_FINISHED_EMPTY
 
     body = "\n".join(
         ru.WORKOUT_PANEL_LINE.format(
             name=exercise.name_ru,
-            sets=", ".join(render_set_value(item, units) for item in items),
+            sets=", ".join(render_set_value(item) for item in items),
         )
         for exercise, items in summary.by_exercise
     )
@@ -314,15 +273,13 @@ def render_workout_summary(summary: WorkoutSummary, units: Units = Units.METRIC)
         duration=format_duration(summary.duration_min),
         sets=summary.total_sets,
         working=summary.working_sets,
-        tonnage=format_weight(summary.tonnage, units),
+        tonnage=format_weight(summary.tonnage),
         exercises=body,
     )
     if summary.records:
         text += ru.WORKOUT_FINISHED_RECORDS.format(
             records="\n".join(
-                ru.WORKOUT_RECORD_LINE.format(
-                    name=exercise.name_ru, best=format_weight(best, units)
-                )
+                ru.WORKOUT_RECORD_LINE.format(name=exercise.name_ru, best=format_weight(best))
                 for exercise, best in summary.records
             )
         )
