@@ -66,3 +66,72 @@ def meal_saved_keyboard(meal_id: int) -> InlineKeyboardMarkup:
         )
     )
     return builder.as_markup()
+
+
+class MealDayCB(CallbackData, prefix="mday"):
+    """A day in the diary. ``offset`` is days back from today, 0 is today."""
+
+    offset: int
+
+
+class MealWeekCB(CallbackData, prefix="mweek"):
+    """The last seven days at a glance."""
+
+
+class MealPickDeleteCB(CallbackData, prefix="mdel"):
+    """Show which meals of ``offset`` can be removed."""
+
+    offset: int
+
+
+def day_keyboard(offset: int, *, has_meals: bool) -> InlineKeyboardMarkup:
+    """Walking backwards is the common direction, so it sits on the left.
+
+    "Позже" appears only when there is a later day to go to: a button that
+    does nothing is worse than a missing one, because it has to be tried
+    before that is known.
+    """
+    builder = InlineKeyboardBuilder()
+    row = [
+        InlineKeyboardButton(
+            text=ru.BTN_MEAL_PREV_DAY, callback_data=MealDayCB(offset=offset + 1).pack()
+        )
+    ]
+    if offset > 0:
+        row.append(
+            InlineKeyboardButton(
+                text=ru.BTN_MEAL_NEXT_DAY, callback_data=MealDayCB(offset=offset - 1).pack()
+            )
+        )
+    builder.row(*row)
+
+    builder.row(InlineKeyboardButton(text=ru.BTN_MEAL_WEEK, callback_data=MealWeekCB().pack()))
+    if has_meals:
+        builder.row(
+            InlineKeyboardButton(
+                text=ru.BTN_MEAL_DELETE_ONE,
+                callback_data=MealPickDeleteCB(offset=offset).pack(),
+            )
+        )
+    return builder.as_markup()
+
+
+def week_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text=ru.BTN_MEAL_TODAY, callback_data=MealDayCB(offset=0).pack())
+    )
+    return builder.as_markup()
+
+
+def delete_picker(meals: list[tuple[int, str]], offset: int) -> InlineKeyboardMarkup:
+    """One button per meal, and a way back that does not delete anything."""
+    builder = InlineKeyboardBuilder()
+    for meal_id, label in meals:
+        builder.row(
+            InlineKeyboardButton(text=label, callback_data=MealUndoCB(meal_id=meal_id).pack())
+        )
+    builder.row(
+        InlineKeyboardButton(text=ru.BTN_CANCEL, callback_data=MealDayCB(offset=offset).pack())
+    )
+    return builder.as_markup()

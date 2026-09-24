@@ -17,7 +17,7 @@ person's own history, fed back into the prompt.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -35,7 +35,7 @@ RECENT_NAMES = 40
 class DayTotals:
     """One day on the plate."""
 
-    day: datetime
+    day: date
     kcal: Decimal
     protein_g: Decimal
     fat_g: Decimal
@@ -142,10 +142,16 @@ class MealService:
         )
         return [name for name, _ in result.all()]
 
-    async def day_totals(self, user_id: int, *, days: int = 7) -> list[DayTotals]:
-        """Calories per day, newest first. The spine of everything above it."""
-        since = datetime.now(UTC).timestamp() - days * 86400
-        day = func.date_trunc("day", Meal.eaten_at).label("day")
+    async def day_totals(self, user_id: int, *, days: int = 7, tz: tzinfo = UTC) -> list[DayTotals]:
+        """Calories per day, newest first. The spine of everything above it.
+
+        Grouped in the reader's own clock rather than in UTC. Dinner at one in
+        the morning in Vietnam is seven the previous evening UTC, so counting
+        by UTC files it under yesterday - and the daily total comes out wrong
+        on exactly the days someone ate late.
+        """
+        since = (datetime.now(UTC) - timedelta(days=days)).timestamp()
+        day = func.date(func.timezone(_zone_name(tz), Meal.eaten_at)).label("day")
         result = await self._session.execute(
             select(
                 day,
@@ -173,6 +179,25 @@ class MealService:
             )
             for row in result.all()
         ]
+
+    async def meals_on(self, user_id: int, day: date, *, tz: tzinfo = UTC) -> list[Meal]:
+        """Everything eaten on one local day, earliest first."""
+        start = datetime.combine(day, time.min, tzinfo=tz)
+        result = await self._session.execute(
+            select(Meal)
+            .where(
+                Meal.user_id == user_id,
+                Meal.eaten_at >= start,
+                Meal.eaten_at < start + timedelta(days=1),
+            )
+            .order_by(Meal.eaten_at)
+        )
+        return list(result.scalars().all())
+
+
+def _zone_name(tz: tzinfo) -> str:
+    """The IANA name Postgres wants, out of whatever tzinfo we were handed."""
+    return getattr(tz, "key", "UTC")
 
 
 def _sum(items: list[MealItem], per_100g: str) -> Decimal:

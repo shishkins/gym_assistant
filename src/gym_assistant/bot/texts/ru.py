@@ -681,12 +681,30 @@ MEAL_DAY_EMPTY = (
     " прислать экран из доставки или просто написать размер: «тарелка 30 см»."
 )
 MEAL_DAY = (
-    "🍽 <b>Сегодня</b>\n\n"
+    "🍽 <b>{title}</b>\n\n"
     "<b>{total} ккал</b> за {meals}\n"
     "Б {protein} · Ж {fat} · У {carb}\n\n"
     "{lines}"
 )
-MEAL_DAY_LINE = "  {when} · {name} — {kcal} ккал"
+MEAL_DAY_LINE = "  {when} · {name} — <b>{kcal}</b> ккал"
+MEAL_DAY_NOTHING = "🍽 <b>{title}</b>\n\nНичего не записано."
+
+MEAL_WEEK = (
+    "📅 <b>Последние 7 дней</b>\n\n{lines}\n\nВ среднем за день с записями: <b>{average} ккал</b>"
+)
+MEAL_WEEK_LINE = "  {day} · <b>{kcal}</b> ккал · {meals}"
+MEAL_WEEK_EMPTY_LINE = "  {day} · —"
+MEAL_WEEK_NOTHING = (
+    "📅 За неделю ничего не записано.\n\nПришлите фото тарелки — разберу и посчитаю."
+)
+
+MEAL_PICK_TO_DELETE = "Какой приём убрать?"
+
+BTN_MEAL_PREV_DAY = "← Вчера"
+BTN_MEAL_NEXT_DAY = "Позже →"
+BTN_MEAL_WEEK = "📅 Неделя"
+BTN_MEAL_TODAY = "Сегодня"
+BTN_MEAL_DELETE_ONE = "🗑 Убрать приём"
 
 BTN_MEAL_SAVE = "✅ Записать"
 BTN_MEAL_CLARIFY = "✏️ Уточнить"

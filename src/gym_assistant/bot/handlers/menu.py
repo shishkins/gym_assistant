@@ -20,6 +20,7 @@ from gym_assistant.bot.handlers.stats import open_stats_menu
 from gym_assistant.bot.handlers.workouts import open_workout_panel
 from gym_assistant.bot.keyboards import CancelCB, MainMenuCB, main_menu_keyboard
 from gym_assistant.bot.texts import ru
+from gym_assistant.config import Settings
 from gym_assistant.domain.models import User
 from gym_assistant.domain.services import ExerciseService
 
@@ -40,6 +41,7 @@ async def menu_action(
     state: FSMContext,
     session: AsyncSession,
     user: User,
+    settings: Settings,
 ) -> None:
     await callback.answer()
     message = callback.message
@@ -51,7 +53,7 @@ async def menu_action(
             await open_workout_panel(message, state, session, user)
         case "food":
             await state.clear()
-            await show_today(message, session, user)
+            await show_today(message, session, user, settings)
         case "stats":
             await open_stats_menu(message, state, session, user)
         case "exercises":

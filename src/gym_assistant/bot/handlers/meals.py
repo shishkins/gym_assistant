@@ -21,29 +21,39 @@ for a second week.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from contextlib import suppress
+from datetime import UTC, date, datetime, timedelta, tzinfo
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.ai.vision import FoodVision, Seen, SeenItem, VisionUnavailableError
 from gym_assistant.bot.filters import RequireRole
 from gym_assistant.bot.keyboards import (
     MealCB,
+    MealDayCB,
+    MealPickDeleteCB,
     MealScaleCB,
     MealUndoCB,
+    MealWeekCB,
+    day_keyboard,
+    delete_picker,
     meal_card_keyboard,
     meal_saved_keyboard,
+    week_keyboard,
 )
 from gym_assistant.bot.states import MealFlow
 from gym_assistant.bot.texts import render, ru
 from gym_assistant.config import Settings
-from gym_assistant.domain.models import GramsSource, Role, User
+from gym_assistant.domain.models import GramsSource, Meal, Role, User
 from gym_assistant.domain.services import Access, MealService
 
 log = structlog.get_logger(__name__)
@@ -61,6 +71,10 @@ UNSURE_BAND_PCT = Decimal(60)
 # A photo Telegram has already compressed. Larger costs more tokens for detail
 # the model does not use.
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
+
+LINE_BREAK = "\n"
+CLOCK = "%H:%M"
+DATE = "%d.%m"
 
 
 def build_vision(settings: Settings) -> FoodVision:
@@ -398,30 +412,178 @@ async def _download(message: Message, file_id: str) -> bytes:
 
 
 @router.message(Command("food"))
-async def cmd_food(message: Message, session: AsyncSession, user: User) -> None:
-    await show_today(message, session, user)
+async def cmd_food(message: Message, session: AsyncSession, user: User, settings: Settings) -> None:
+    await show_today(message, session, user, settings)
 
 
-async def show_today(message: Message, session: AsyncSession, user: User) -> None:
+async def show_today(
+    message: Message, session: AsyncSession, user: User, settings: Settings
+) -> None:
     """The day so far. Also the menu's entry point, because a feature whose
     only door is "send a photo and hope" is a feature nobody finds."""
-    service = MealService(session)
-    totals = await service.day_totals(user.id, days=1)
-    if not totals:
-        await message.answer(ru.MEAL_DAY_EMPTY)
+    text, markup = await _day(session, user, settings, offset=0)
+    await message.answer(text, reply_markup=markup)
+
+
+@router.callback_query(MealDayCB.filter())
+async def show_day(
+    callback: CallbackQuery,
+    callback_data: MealDayCB,
+    session: AsyncSession,
+    user: User,
+    settings: Settings,
+) -> None:
+    await callback.answer()
+    message = callback.message
+    if not isinstance(message, Message):
+        return
+    text, markup = await _day(session, user, settings, offset=callback_data.offset)
+    with suppress(TelegramBadRequest):
+        # Tapping the day already on screen edits a message into itself, which
+        # Telegram refuses. Nothing is wrong and nothing needs saying.
+        await message.edit_text(text, reply_markup=markup)
+
+
+async def _day(
+    session: AsyncSession, user: User, settings: Settings, *, offset: int
+) -> tuple[str, InlineKeyboardMarkup]:
+    tz = _zone(settings)
+    day = (datetime.now(tz) - timedelta(days=offset)).date()
+    meals = await MealService(session).meals_on(user.id, day, tz=tz)
+    title = _day_title(day, offset)
+
+    if not meals:
+        return ru.MEAL_DAY_NOTHING.format(title=title), day_keyboard(offset, has_meals=False)
+
+    lines = LINE_BREAK.join(
+        ru.MEAL_DAY_LINE.format(
+            when=meal.eaten_at.astimezone(tz).strftime(CLOCK),
+            name=_short(meal),
+            kcal=render.format_decimal(meal.kcal.quantize(Decimal(1))),
+        )
+        for meal in meals
+    )
+    text = ru.MEAL_DAY.format(
+        title=title,
+        total=_sum(meals, "kcal"),
+        meals=_meals_word(len(meals)),
+        protein=_sum(meals, "protein_g"),
+        fat=_sum(meals, "fat_g"),
+        carb=_sum(meals, "carb_g"),
+        lines=lines,
+    )
+    return text, day_keyboard(offset, has_meals=True)
+
+
+@router.callback_query(MealWeekCB.filter())
+async def show_week(
+    callback: CallbackQuery, session: AsyncSession, user: User, settings: Settings
+) -> None:
+    """Seven days at a glance, with untracked days left blank.
+
+    A gap is information: it is how a run of days nobody logged stays visible
+    instead of quietly dragging an average down.
+    """
+    await callback.answer()
+    message = callback.message
+    if not isinstance(message, Message):
         return
 
-    day = totals[0]
-    await message.answer(
-        ru.MEAL_DAY.format(
-            total=render.format_decimal(day.kcal.quantize(Decimal(1))),
-            meals=_meals_word(day.meals),
-            protein=render.format_decimal(day.protein_g.quantize(Decimal(1))),
-            fat=render.format_decimal(day.fat_g.quantize(Decimal(1))),
-            carb=render.format_decimal(day.carb_g.quantize(Decimal(1))),
-            lines="",
+    tz = _zone(settings)
+    found = await MealService(session).day_totals(user.id, days=7, tz=tz)
+    totals = {entry.day: entry for entry in found}
+    if not totals:
+        with suppress(TelegramBadRequest):
+            await message.edit_text(ru.MEAL_WEEK_NOTHING, reply_markup=week_keyboard())
+        return
+
+    today = datetime.now(tz).date()
+    lines = []
+    for back in range(7):
+        day = today - timedelta(days=back)
+        entry = totals.get(day)
+        if entry is None:
+            lines.append(ru.MEAL_WEEK_EMPTY_LINE.format(day=day.strftime(DATE)))
+            continue
+        lines.append(
+            ru.MEAL_WEEK_LINE.format(
+                day=day.strftime(DATE),
+                kcal=render.format_decimal(entry.kcal.quantize(Decimal(1))),
+                meals=_meals_word(entry.meals),
+            )
         )
-    )
+
+    average = sum((entry.kcal for entry in totals.values()), Decimal(0)) / len(totals)
+    with suppress(TelegramBadRequest):
+        await message.edit_text(
+            ru.MEAL_WEEK.format(
+                lines=LINE_BREAK.join(lines),
+                average=render.format_decimal(average.quantize(Decimal(1))),
+            ),
+            reply_markup=week_keyboard(),
+        )
+
+
+@router.callback_query(MealPickDeleteCB.filter())
+async def pick_to_delete(
+    callback: CallbackQuery,
+    callback_data: MealPickDeleteCB,
+    session: AsyncSession,
+    user: User,
+    settings: Settings,
+) -> None:
+    """Undo right after saving covers a mistaken tap. This covers noticing
+    later, which is when a wrong entry is usually spotted."""
+    await callback.answer()
+    message = callback.message
+    if not isinstance(message, Message):
+        return
+
+    tz = _zone(settings)
+    day = (datetime.now(tz) - timedelta(days=callback_data.offset)).date()
+    meals = await MealService(session).meals_on(user.id, day, tz=tz)
+    if not meals:
+        return
+
+    labelled = [
+        (meal.id, f"{meal.eaten_at.astimezone(tz).strftime(CLOCK)} - {_short(meal)}"[:60])
+        for meal in meals
+    ]
+    with suppress(TelegramBadRequest):
+        await message.edit_text(
+            ru.MEAL_PICK_TO_DELETE, reply_markup=delete_picker(labelled, callback_data.offset)
+        )
+
+
+def _zone(settings: Settings) -> tzinfo:
+    try:
+        return ZoneInfo(settings.timezone)
+    except (ZoneInfoNotFoundError, ValueError):  # pragma: no cover - a typo in .env
+        log.warning("unknown_timezone", value=settings.timezone)
+        return UTC
+
+
+def _day_title(day: date, offset: int) -> str:
+    if offset == 0:
+        return "Сегодня"
+    if offset == 1:
+        return "Вчера"
+    return day.strftime(DATE)
+
+
+def _short(meal: Meal) -> str:
+    """The meal in a few words: its biggest item, and how many others."""
+    if not meal.items:
+        return "приём пищи"
+    biggest = max(meal.items, key=lambda item: item.grams * item.kcal_100g)
+    name = biggest.name if len(biggest.name) <= 40 else biggest.name[:37] + "…"
+    rest = len(meal.items) - 1
+    return f"{name} +{rest}" if rest else name
+
+
+def _sum(meals: list[Meal], field: str) -> str:
+    total = sum((getattr(meal, field) for meal in meals), Decimal(0))
+    return render.format_decimal(total.quantize(Decimal(1)))
 
 
 def _meals_word(count: int) -> str:

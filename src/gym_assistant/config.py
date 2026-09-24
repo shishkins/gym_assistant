@@ -54,6 +54,17 @@ class Settings(BaseSettings):
     # adaptive TDEE absorbs a steady bias and cannot absorb a moving one, so
     # swapping this mid-history is a data decision, not a config tweak.
     ai_model_vision: str = "claude-sonnet-5"
+
+    # Which clock a day is counted by. Rows stay UTC; this only decides
+    # where one day ends and the next begins when they are read back.
+    #
+    # A food diary needs this in a way a workout log does not: dinner at
+    # one in the morning in Vietnam is seven in the evening UTC of the day
+    # before, so counting by UTC files it under yesterday. One setting for
+    # the whole bot rather than one per person - everyone using it lives in
+    # the same place, and the day a per-user field is worth its weight is
+    # the day that stops being true.
+    timezone: str = "UTC"
     ai_monthly_limit_usd: float = 10.0
 
     # --- Speech to text (iteration 6+) ---

@@ -7,8 +7,10 @@ API call itself is the SDK's problem.
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 import pytest_asyncio
@@ -347,3 +349,114 @@ async def test_a_written_hint_reaches_the_model_and_is_recorded(
     meal = await MealService(session).last(await _user_id(session))
     assert meal is not None
     assert meal.hints["used"][0]["text"] == "тарелка 30 см"
+
+
+# --- reading the diary back -----------------------------------------------
+
+
+def _vietnam() -> Settings:
+    """The bot as it actually runs: a clock seven hours ahead of UTC."""
+    return Settings(  # type: ignore[call-arg]
+        bot_token="42:test-token-not-real", timezone="Asia/Ho_Chi_Minh"
+    )
+
+
+async def test_the_day_lists_what_was_eaten(
+    bot: BotHarness, session: AsyncSession, vision: StubVision
+) -> None:
+    """The total alone was the whole screen until now, which says how much but
+    not what - and "what" is the only part worth correcting."""
+    await bot.send_photo()
+    await bot.tap_button("Записать")
+
+    await bot.send("/food")
+
+    assert "Фо бо" in bot.session.last_text
+    assert "455" in bot.session.last_text
+
+
+async def test_a_day_with_nothing_says_so_and_still_offers_the_week(
+    bot: BotHarness, vision: StubVision
+) -> None:
+    await bot.send("/food")
+
+    assert "Ничего не записано" in bot.session.last_text
+    assert bot.session.button_with("Неделя")
+
+
+async def test_yesterday_is_one_tap_away(
+    bot: BotHarness, session: AsyncSession, vision: StubVision
+) -> None:
+    await bot.send_photo()
+    await bot.tap_button("Записать")
+    await bot.send("/food")
+    await bot.tap_button("Вчера")
+
+    assert "Вчера" in bot.session.last_text
+    assert "Фо бо" not in bot.session.last_text, "вчерашний день показал сегодняшнюю еду"
+
+
+async def test_a_meal_can_be_removed_later_not_only_right_after_saving(
+    bot: BotHarness, session: AsyncSession, vision: StubVision
+) -> None:
+    """Undo covers a mistaken tap; this covers noticing an hour later, which
+    is when a wrong entry is usually spotted."""
+    await bot.send_photo()
+    await bot.tap_button("Записать")
+    await bot.send("/food")
+    await bot.tap_button("Убрать приём")
+    await bot.tap_button("Фо бо")
+
+    assert await _meals(session) == []
+
+
+async def test_the_week_shows_days_without_records_as_gaps(
+    bot: BotHarness, session: AsyncSession, vision: StubVision
+) -> None:
+    """A gap is information: it keeps a run of untracked days visible instead
+    of quietly dragging the average down."""
+    await bot.send_photo()
+    await bot.tap_button("Записать")
+    await bot.send("/food")
+    await bot.tap_button("Неделя")
+
+    body = bot.session.last_text
+    assert body.count("—") >= 6, "дни без записей не показаны пропусками"
+    assert "В среднем за день" in body
+
+
+# --- the day boundary -----------------------------------------------------
+
+
+async def test_a_late_dinner_counts_as_that_evening_not_the_day_before(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dinner at one in the morning in Vietnam is seven the previous evening
+    UTC. Counting days by UTC files it under yesterday, so the daily total
+    comes out wrong on exactly the days someone ate late.
+    """
+    tz = ZoneInfo("Asia/Ho_Chi_Minh")
+    service = MealService(session)
+    user = await ProfileService(session).get_or_create_user(TELEGRAM_ID)
+
+    local_night = datetime(2026, 9, 20, 1, 30, tzinfo=tz)
+    await service.record(
+        user.id,
+        items=[
+            {
+                "name": "Поздний ужин",
+                "grams": "300",
+                "kcal_100g": "150",
+                "protein_100g": "10",
+                "fat_100g": "5",
+                "carb_100g": "15",
+            }
+        ],
+        eaten_at=local_night,
+    )
+
+    same_day = await service.meals_on(user.id, date(2026, 9, 20), tz=tz)
+    assert len(same_day) == 1, "поздний ужин уехал в другой день"
+
+    day_before = await service.meals_on(user.id, date(2026, 9, 19), tz=tz)
+    assert day_before == []
