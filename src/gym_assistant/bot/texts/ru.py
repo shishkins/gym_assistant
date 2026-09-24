@@ -626,3 +626,59 @@ ADMIN_AI_COSTS = (
 )
 ADMIN_AI_COST_LINE = "{who} — ${cost} · {calls} вызовов"
 ADMIN_AI_COSTS_NOBODY = "Ассистентом ещё никто не пользовался."
+
+# --- Food diary ------------------------------------------------------------
+
+MEAL_LOOKING = "👀 Смотрю, что на тарелке…"
+
+MEAL_CARD = "🍽 <b>{total} ккал</b>\nБ {protein} · Ж {fat} · У {carb}\n\n{items}"
+MEAL_ITEM_LINE = "  • {name} — <b>{grams} г</b> · {kcal} ккал"
+# Shown only where the model admitted it was guessing: a warning on every
+# line is a warning nobody reads.
+MEAL_ITEM_UNSURE = "  • {name} — <b>{grams} г</b> · {kcal} ккал  <i>(на глаз)</i>"
+
+MEAL_QUESTION = "\n\n❓ <i>{question}</i>\n<i>Ответьте сообщением — пересчитаю.</i>"
+
+MEAL_CLARIFY = (
+    "Чем помочь разбору? Любым из этого — как удобнее:\n\n"
+    "📄 <b>Фото меню или экрана доставки</b> — там название"
+    " и часто граммовка, это точнее всего.\n\n"
+    "📏 <b>Фото с предметом для масштаба</b> — вилка, ладонь, телефон рядом с тарелкой.\n\n"
+    "✍️ <b>Просто напишите</b> — «тарелка 30 см», «стакан 0.5»,"
+    " «порция была большая», «это бургер, а не сэндвич».\n\n"
+    "Или /cancel, чтобы оставить как есть."
+)
+
+MEAL_RETHINKING = "🤔 Пересчитываю с учётом подсказки…"
+
+MEAL_SAVED = "✅ Записал: <b>{total} ккал</b>\nСегодня всего: <b>{today} ккал</b>"
+MEAL_UNDONE = "↩️ Убрал запись."
+MEAL_NOTHING_TO_UNDO = "Отменять нечего."
+MEAL_DISCARDED = "Выбросил. Пришлите другое фото, если хотите записать."
+
+MEAL_NOT_FOOD = (
+    "На фото не еда — сохранил как фото прогресса.\n\n"
+    "<i>Если это всё-таки была еда, пришлите снимок, где её лучше видно.</i>"
+)
+MEAL_EMPTY = "Разобрал фото, но еды на нём не нашёл. Попробуйте снимок поближе."
+MEAL_FAILED = "Не смог разобрать фото. Попробуйте ещё раз через минуту."
+MEAL_EXPIRED = "Эта карточка уже неактуальна — пришлите фото заново."
+
+MEAL_DAY_EMPTY = "Сегодня ещё ничего не записано. Пришлите фото еды."
+MEAL_DAY = (
+    "🍽 <b>Сегодня</b>\n\n"
+    "<b>{total} ккал</b> за {meals}\n"
+    "Б {protein} · Ж {fat} · У {carb}\n\n"
+    "{lines}"
+)
+MEAL_DAY_LINE = "  {when} · {name} — {kcal} ккал"
+
+BTN_MEAL_SAVE = "✅ Записать"
+BTN_MEAL_CLARIFY = "✏️ Уточнить"
+BTN_MEAL_DISCARD = "🗑 Не то"
+BTN_MEAL_UNDO = "↩️ Отменить"
+# Multipliers rather than a numeric editor: the whole error lives in the
+# portion, and half of it is caught by "это была половина".
+BTN_MEAL_HALF = "½ порции"
+BTN_MEAL_ONE_AND_HALF = "1½ порции"
+BTN_MEAL_DOUBLE = "2 порции"

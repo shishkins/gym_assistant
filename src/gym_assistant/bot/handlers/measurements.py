@@ -11,12 +11,14 @@ from aiogram.types import Message
 from aiogram.utils.media_group import MediaGroupBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant.bot.handlers import meals
 from gym_assistant.bot.keyboards import cancel_keyboard
 from gym_assistant.bot.states import WeightEntry
 from gym_assistant.bot.texts import render, ru
+from gym_assistant.config import Settings
 from gym_assistant.domain.models import User
 from gym_assistant.domain.parsing import ValueParseError, parse_weight
-from gym_assistant.domain.services import MeasurementService
+from gym_assistant.domain.services import Access, MeasurementService
 
 router = Router(name="measurements")
 
@@ -108,14 +110,36 @@ async def weight_entered(
 
 
 @router.message(F.photo)
-async def photo_received(message: Message, session: AsyncSession, user: User) -> None:
-    """Any photo becomes a progress shot.
+async def photo_received(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    user: User,
+    settings: Settings,
+    access: Access | None = None,
+) -> None:
+    """A photo is a meal or a progress shot, and the model decides which.
+
+    Asked for that way rather than with a button: at three or four meals a day
+    an extra tap on every picture is a tax, and the one thing a model reliably
+    gets right is whether it is looking at a plate or at a person.
 
     We store Telegram's file_id rather than the bytes: Telegram keeps the
-    file, and we keep a handle to it.
+    file, and we keep a handle to it. The bytes are borrowed for the reading
+    and not written anywhere.
     """
     assert message.photo is not None
     file_id = message.photo[-1].file_id  # last entry is the largest rendition
+
+    bot = message.bot
+    if bot is not None:
+        buffer = await bot.download(file_id)
+        if buffer is not None:
+            handled = await meals.handle_food_photo(
+                message, state, session, user, settings, buffer.read(), file_id, access
+            )
+            if handled:
+                return
 
     weight: Decimal | None = None
     if message.caption:

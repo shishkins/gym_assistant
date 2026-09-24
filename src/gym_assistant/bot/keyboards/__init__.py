@@ -21,6 +21,13 @@ from gym_assistant.bot.keyboards.exercises import (
     undo_hide_keyboard,
 )
 from gym_assistant.bot.keyboards.main_menu import MainMenuCB, main_menu_keyboard
+from gym_assistant.bot.keyboards.meals import (
+    MealCB,
+    MealScaleCB,
+    MealUndoCB,
+    meal_card_keyboard,
+    meal_saved_keyboard,
+)
 from gym_assistant.bot.keyboards.profile import (
     CHOICE_ENUMS,
     ChoiceCB,
@@ -62,6 +69,9 @@ __all__ = [
     "ExNewCB",
     "ExUnhideCB",
     "MainMenuCB",
+    "MealCB",
+    "MealScaleCB",
+    "MealUndoCB",
     "SetAdjustCB",
     "SetCommitCB",
     "SkipCB",
@@ -78,6 +88,8 @@ __all__ = [
     "goal_keyboard",
     "groups_keyboard",
     "main_menu_keyboard",
+    "meal_card_keyboard",
+    "meal_saved_keyboard",
     "menu_keyboard",
     "new_equipment_keyboard",
     "new_group_keyboard",

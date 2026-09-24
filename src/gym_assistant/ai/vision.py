@@ -250,7 +250,24 @@ class FoodVision:
     def available(self) -> bool:
         return self._client is not None
 
-    async def look(self, image: bytes, media_type: str = "image/jpeg") -> Seen:
+    async def look(
+        self,
+        image: bytes,
+        *,
+        media_type: str = "image/jpeg",
+        hint: list[str] | None = None,
+        note: str | None = None,
+        extra: bytes | None = None,
+        previous: list[SeenItem] | None = None,
+    ) -> Seen:
+        """One photo, plus whatever the person chose to add.
+
+        Everything past ``image`` is data appended after the frozen prompt,
+        never a change to it - the same arrangement as the chat assistant's
+        per-user line. That is what keeps ``PROMPT_VERSION`` meaning something:
+        two meals read under the same version were read by the same
+        instructions, whatever hints happened to travel with them.
+        """
         if self._client is None:
             raise VisionUnavailableError("ANTHROPIC_API_KEY is not set")
 
@@ -264,15 +281,8 @@ class FoodVision:
                     {
                         "role": "user",
                         "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": cast("Any", media_type),
-                                    "data": payload,
-                                },
-                            },
-                            {"type": "text", "text": PROMPT},
+                            *cast("Any", _images(payload, extra, media_type)),
+                            {"type": "text", "text": PROMPT + _context(hint, note, previous)},
                         ],
                     }
                 ],
@@ -344,3 +354,62 @@ def _item(entry: dict[str, Any]) -> SeenItem | None:
 
 def _money(value: Any) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.1"))
+
+
+def _images(payload: str, extra: bytes | None, media_type: str) -> list[dict[str, Any]]:
+    """The plate first, the hint photo second, in that order.
+
+    The second one is usually a menu or a delivery app - a picture of text.
+    It carries the name and often the weight outright, which beats any
+    estimate made by looking at the food itself.
+    """
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "image",
+            "source": {"type": "base64", "media_type": media_type, "data": payload},
+        }
+    ]
+    if extra is not None:
+        blocks.append(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": base64.standard_b64encode(extra).decode(),
+                },
+            }
+        )
+    return blocks
+
+
+def _context(hint: list[str] | None, note: str | None, previous: list[SeenItem] | None) -> str:
+    """Per-request data, appended after the frozen prompt and never inside it."""
+    parts: list[str] = []
+
+    if hint:
+        # The anchor that stops the same croissant coming back under a new
+        # name every morning. A suggestion, not a menu: food is an open set,
+        # and a closed list would wall off the first unfamiliar dish.
+        listed = "\n".join(f"- {name}" for name in hint)
+        parts.append(
+            "\n\nЧеловек недавно ел вот это. Если на фото что-то из списка — "
+            "назови ТОЧНО так же, слово в слово. Если нет — назови свободно, "
+            "список не ограничивает:\n" + listed
+        )
+
+    if previous:
+        was = "\n".join(f"- {item.name}: {item.grams:.0f} г" for item in previous)
+        parts.append(
+            "\n\nТы уже разбирал это фото и получил вот что. Исправь то, "
+            "что расходится с подсказкой ниже, остальное оставь как было:\n" + was
+        )
+
+    if note:
+        # Last, so it outranks everything above it: it is the only line here
+        # that came from someone who saw the actual plate.
+        parts.append(
+            "\n\nПОДСКАЗКА ОТ ЧЕЛОВЕКА, она важнее твоей оценки по фото:\n" + note.strip()[:500]
+        )
+
+    return "".join(parts)

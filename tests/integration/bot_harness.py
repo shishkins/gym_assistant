@@ -9,6 +9,7 @@ API calls the bot would have made.
 
 from __future__ import annotations
 
+import io
 from datetime import UTC, datetime
 from typing import Any
 
@@ -23,6 +24,7 @@ from aiogram.types import (
     Chat,
     InlineKeyboardMarkup,
     Message,
+    PhotoSize,
     Update,
 )
 from aiogram.types import (
@@ -67,13 +69,17 @@ class RecordingSession(BaseSession):
 
         if name in {"SendMessage", "EditMessageText", "SendPhoto"}:
             self._message_id += 1
+            # Bound to the bot, as the real session does. Without it a handler
+            # that edits or deletes its own reply - "looking at the plate…"
+            # replaced by the breakdown - dies on the reply instead of on
+            # anything it was written to do.
             return Message(
                 message_id=self._message_id,
                 date=datetime.now(UTC),
                 chat=Chat(id=CHAT_ID, type="private"),
                 text=getattr(method, "text", None) or "",
                 reply_markup=getattr(method, "reply_markup", None),
-            )
+            ).as_(bot)
         if name == "SendMediaGroup":
             return []
         if name == "GetMe":  # pragma: no cover - not used by these tests
@@ -197,6 +203,38 @@ class BotHarness:
     async def tap_button(self, fragment: str) -> None:
         await self.tap(self.session.button_with(fragment))
 
+    async def send_photo(self, caption: str | None = None) -> None:
+        """Simulates the user sending a picture.
+
+        The bytes are a stub: nothing in the bot looks at them, and the one
+        thing that would - the model - is swapped out in every test that uses
+        this. What matters is that a photo arrives and that downloading it
+        works, because both are wiring the service tests cannot reach.
+        """
+        self._message_id += 1
+        update = Update(
+            update_id=self._next_update_id(),
+            message=Message(
+                message_id=self._message_id,
+                date=datetime.now(UTC),
+                chat=Chat(id=CHAT_ID, type="private"),
+                from_user=TelegramUser(
+                    id=TELEGRAM_USER_ID, is_bot=False, first_name="Тестер", username="tester"
+                ),
+                photo=[
+                    PhotoSize(
+                        file_id=f"photo-{self._message_id}",
+                        file_unique_id=f"u-{self._message_id}",
+                        width=960,
+                        height=1280,
+                        file_size=100_000,
+                    )
+                ],
+                caption=caption,
+            ),
+        )
+        await self.dispatcher.feed_update(self.bot, update)
+
 
 def _command_entities(text: str) -> list[Any] | None:
     """aiogram's Command filter needs the entity Telegram would have attached."""
@@ -273,4 +311,14 @@ def build_harness(
         session=recording,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+
+    async def _download(*_args: Any, **_kwargs: Any) -> io.BytesIO:
+        """Telegram's file store, stubbed.
+
+        The real one is two HTTP calls that the recording session cannot
+        answer, and the bytes never reach anything but the stubbed model.
+        """
+        return io.BytesIO(b"not-really-a-jpeg")
+
+    bot.download = _download  # type: ignore[method-assign]
     return BotHarness(_dispatcher(settings), bot, recording)
