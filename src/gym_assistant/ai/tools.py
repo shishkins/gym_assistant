@@ -408,10 +408,14 @@ def _in_user_units(value: Any, units: Units) -> Any:
     if isinstance(value, dict):
         converted = {}
         for key, item in value.items():
-            if key.endswith("_kg") and isinstance(item, int | float):
+            if not key.endswith("_kg"):
+                converted[key] = _in_user_units(item, units)
+            elif isinstance(item, int | float):
                 converted[f"{key[:-3]}_lbs"] = _money(from_kg(Decimal(str(item)), units))
             else:
-                converted[key] = _in_user_units(item, units)
+                # A missing weight still renames: one key ending in _kg beside
+                # a dozen ending in _lbs reads as a unit, not as an absence.
+                converted[f"{key[:-3]}_lbs"] = item
         return converted
     if isinstance(value, list):
         return [_in_user_units(item, units) for item in value]

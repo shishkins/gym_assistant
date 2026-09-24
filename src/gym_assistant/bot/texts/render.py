@@ -89,9 +89,15 @@ def format_when(moment: datetime, *, now: datetime | None = None) -> str:
     return format_date(moment.date())
 
 
+def _units_line(units: Units) -> str:
+    return ru.PROFILE_UNITS.format(unit=label(units))
+
+
 def render_profile(summary: ProfileSummary, units: Units = Units.METRIC) -> str:
     if summary.is_empty:
-        return ru.PROFILE_EMPTY
+        # The units line belongs here too: it is the one setting that works
+        # with no profile at all, and the card carries the button for it.
+        return ru.PROFILE_EMPTY + "\n\n" + _units_line(units)
 
     lines = [ru.PROFILE_HEADER]
 
@@ -120,7 +126,7 @@ def render_profile(summary: ProfileSummary, units: Units = Units.METRIC) -> str:
 
     # Shown in metric too: without it the switch button has nothing to switch
     # away from, and a stray tap becomes unexplainable.
-    lines.append("\n" + ru.PROFILE_UNITS.format(unit=label(units)))
+    lines.append("\n" + _units_line(units))
 
     return "\n".join(lines)
 
