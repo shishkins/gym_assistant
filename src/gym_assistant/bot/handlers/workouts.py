@@ -20,12 +20,14 @@ from gym_assistant.bot.keyboards import (
     SetCommitCB,
     WorkoutCB,
     WorkoutExerciseCB,
+    WorkoutFavCB,
     WorkoutSearchPageCB,
     cancel_keyboard,
     panel_keyboard,
     search_results_keyboard,
     set_entry_keyboard,
     start_keyboard,
+    technique_keyboard,
 )
 from gym_assistant.bot.states import WorkoutFlow
 from gym_assistant.bot.texts import render, ru
@@ -93,7 +95,13 @@ async def _exercise_panel(
     )
 
     text = render.render_exercise_panel(history, today, weight=weight, reps=reps)
-    return text, set_entry_keyboard(weight=weight, reps=reps, can_repeat=bool(today))
+    is_favourite = await ExerciseService(service.session).is_favourite(user.id, exercise.id)
+    return text, set_entry_keyboard(
+        weight=weight,
+        reps=reps,
+        can_repeat=bool(today),
+        is_favourite=is_favourite,
+    )
 
 
 async def _edit(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup) -> None:
@@ -185,6 +193,9 @@ async def workout_action(
             if isinstance(message, Message):
                 await message.answer(ru.WORKOUT_INPUT_HELP)
 
+        case "technique":
+            await _technique(callback, session, state, user)
+
         case "catalogue":
             # The session stays open; the catalogue offers a way back.
             await show_catalogue(callback, session, state, user)
@@ -194,6 +205,67 @@ async def workout_action(
 
         case "finish":
             await _finish(callback, service, state, user)
+
+
+async def _technique(
+    callback: CallbackQuery, session: AsyncSession, state: FSMContext, user: User
+) -> None:
+    """The technique card for the exercise being done right now.
+
+    Asked for after a real session: the catalogue was reachable, but it
+    opened on a browse list and getting back cost several taps. Between reps
+    nobody wants to navigate - they want this exercise, then back.
+    """
+    exercise_id = (await state.get_data()).get("exercise_id")
+    message = callback.message
+    if exercise_id is None or not isinstance(message, Message):
+        if isinstance(message, Message):
+            await message.answer(ru.WORKOUT_TECHNIQUE_NO_EXERCISE)
+        return
+
+    service = ExerciseService(session)
+    exercise = await service.get(int(exercise_id), user_id=user.id)
+    if exercise is None:
+        return
+
+    await message.answer(
+        render.render_exercise_card(exercise),
+        reply_markup=technique_keyboard(
+            exercise.id,
+            is_favourite=await service.is_favourite(user.id, exercise.id),
+        ),
+    )
+
+
+@router.callback_query(WorkoutFavCB.filter())
+async def toggle_favourite(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+    user: User,
+) -> None:
+    """Stars the current exercise and stays put.
+
+    Deliberately not the catalogue's own toggle: that one re-renders the
+    exercise card, which would throw someone out of the set they are in the
+    middle of.
+    """
+    exercise_id = (await state.get_data()).get("exercise_id")
+    if exercise_id is None:
+        await callback.answer(ru.WORKOUT_TECHNIQUE_NO_EXERCISE, show_alert=True)
+        return
+
+    service = ExerciseService(session)
+    added = await service.toggle_favourite(user.id, int(exercise_id))
+    await callback.answer(ru.EXERCISE_FAV_ADDED if added else ru.EXERCISE_FAV_REMOVED)
+
+    exercise = await service.get(int(exercise_id), user_id=user.id)
+    message = callback.message
+    if exercise is None or not isinstance(message, Message):
+        return
+
+    text, markup = await _exercise_panel(WorkoutService(session), user, exercise, state)
+    await _edit(callback, text, markup)
 
 
 async def _undo(

@@ -10,7 +10,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.config import Settings
-from gym_assistant.domain.services import ProfileService, WorkoutService
+from gym_assistant.domain.services import ExerciseService, ProfileService, WorkoutService
 from tests.integration.bot_harness import BotHarness, build_harness
 
 
@@ -511,3 +511,88 @@ async def test_catalogue_outside_a_workout_is_unchanged(bot: BotHarness) -> None
 
     await bot.send("бенч")
     assert "Нашёл по запросу" in bot.session.last_text
+
+
+# --- what a real session in the gym asked for -----------------------------
+#
+# Both of these existed already, two screens away, and the second screen
+# dropped you out of the set you were in the middle of. Between reps nobody
+# wants to navigate.
+
+
+async def test_technique_is_one_tap_from_the_set(bot: BotHarness) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    bot.session.clear()
+    await bot.tap_button("Техника")
+
+    text = bot.session.last_text
+    assert "Жим штанги лёжа" in text
+    assert "Лопатки" in text, "в карточке нет советов по технике"
+
+
+async def test_technique_leads_back_to_the_same_set(bot: BotHarness, session: AsyncSession) -> None:
+    """Not to the catalogue: the previous route lost people in a browse list."""
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+    await bot.tap_button("Техника")
+
+    await bot.tap_button("К подходу")
+
+    assert "Жим штанги лёжа" in bot.session.last_text
+    assert bot.session.button_with("Повторить подход")
+
+
+async def test_technique_without_an_exercise_says_so(bot: BotHarness) -> None:
+    await bot.send("/workout")
+    await bot.tap_button("Как записывать")  # any panel button, no exercise picked
+
+    assert "Жим" not in bot.session.last_text
+
+
+async def test_favourite_from_the_set_panel(bot: BotHarness, session: AsyncSession) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    await bot.tap_button("В избранное")
+
+    user = await ProfileService(session).get_or_create_user(777)
+    service = ExerciseService(session)
+    bench = (await service.search("бенч", user_id=user.id))[0]
+    assert await service.is_favourite(user.id, bench.id) is True
+
+
+async def test_favouriting_keeps_you_on_the_set(bot: BotHarness) -> None:
+    """The catalogue's own toggle re-renders the exercise card, which would
+    throw someone out of the set they are in the middle of."""
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    bot.session.clear()
+    await bot.tap_button("В избранное")
+
+    assert bot.session.button_with("Повторить подход"), "ушли с панели подхода"
+
+
+async def test_the_star_shows_the_current_state(bot: BotHarness) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+    assert bot.session.button_with("В избранное")
+
+    await bot.tap_button("В избранное")
+
+    assert bot.session.button_with("В избранном"), "звезда не отразила, что упражнение добавлено"
+
+
+async def test_favourite_toggles_back(bot: BotHarness, session: AsyncSession) -> None:
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+    await bot.tap_button("В избранное")
+
+    await bot.tap_button("В избранном")
+
+    user = await ProfileService(session).get_or_create_user(777)
+    service = ExerciseService(session)
+    bench = (await service.search("бенч", user_id=user.id))[0]
+    assert await service.is_favourite(user.id, bench.id) is False

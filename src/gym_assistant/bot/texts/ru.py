@@ -430,6 +430,14 @@ WORKOUT_INPUT_HELP = (
 
 BTN_WORKOUT_HELP = "❔ Как записывать"
 BTN_WORKOUT_CATALOGUE = "📖 Справочник"
+BTN_WORKOUT_TECHNIQUE = "📖 Техника"
+BTN_WORKOUT_FAV = "⭐ В избранное"
+BTN_WORKOUT_UNFAV = "⭐ В избранном"
+BTN_WORKOUT_BACK_TO_SET = "⬅️ К подходу"
+
+WORKOUT_TECHNIQUE_NO_EXERCISE = (
+    "Сначала выберите упражнение — техника показывается для того, что вы сейчас делаете."
+)
 BTN_LOG_THIS = "➕ Записать подход"
 
 # --- Statistics -----------------------------------------------------------

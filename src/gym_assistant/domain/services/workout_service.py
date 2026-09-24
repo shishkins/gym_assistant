@@ -92,6 +92,17 @@ class WorkoutService:
         self._workouts = WorkoutRepository(session)
         self._exercises = ExerciseRepository(session)
 
+    @property
+    def session(self) -> AsyncSession:
+        """The session this service runs on.
+
+        Exposed so a handler that already holds this service can reach a
+        sibling service without threading the session through every call
+        site that builds a panel. Read-only on purpose: nothing outside is
+        meant to commit on it.
+        """
+        return self._session
+
     # -- session lifecycle -------------------------------------------------
 
     async def open_workout(self, user_id: int) -> Workout | None:

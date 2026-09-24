@@ -23,7 +23,7 @@ WEIGHT_STEPS = (Decimal("-5"), Decimal("-2.5"), Decimal("2.5"), Decimal("5"))
 class WorkoutCB(CallbackData, prefix="wo"):
     """Session-level action."""
 
-    action: str  # start | panel | finish | undo | find | help | catalogue
+    action: str  # start | panel | finish | undo | find | help | catalogue | technique
 
 
 class WorkoutExerciseCB(CallbackData, prefix="woe"):
@@ -39,6 +39,10 @@ class SetAdjustCB(CallbackData, prefix="wos"):
 
 class SetCommitCB(CallbackData, prefix="woc"):
     warmup: bool = False
+
+
+class WorkoutFavCB(CallbackData, prefix="wofav"):
+    """Star the exercise being done, without leaving the set panel."""
 
 
 class WorkoutSearchPageCB(CallbackData, prefix="wosp"):
@@ -136,7 +140,11 @@ def panel_keyboard(frequent: list[Exercise]) -> InlineKeyboardMarkup:
 
 
 def set_entry_keyboard(
-    *, weight: Decimal | None, reps: int, can_repeat: bool
+    *,
+    weight: Decimal | None,
+    reps: int,
+    can_repeat: bool,
+    is_favourite: bool = False,
 ) -> InlineKeyboardMarkup:
     """Prefilled set with nudges. Committing it is one tap from here."""
     builder = InlineKeyboardBuilder()
@@ -173,6 +181,19 @@ def set_entry_keyboard(
     builder.row(
         InlineKeyboardButton(text=ru.BTN_WARMUP, callback_data=SetCommitCB(warmup=True).pack())
     )
+    # Asked for after a real session: both of these were two screens away,
+    # and the second screen dropped you out of the set you were in the
+    # middle of. Technique is something you want mid-exercise, not before.
+    builder.row(
+        InlineKeyboardButton(
+            text=ru.BTN_WORKOUT_TECHNIQUE,
+            callback_data=WorkoutCB(action="technique").pack(),
+        ),
+        InlineKeyboardButton(
+            text=ru.BTN_WORKOUT_UNFAV if is_favourite else ru.BTN_WORKOUT_FAV,
+            callback_data=WorkoutFavCB().pack(),
+        ),
+    )
     builder.row(
         InlineKeyboardButton(
             text=ru.BTN_WORKOUT_OTHER, callback_data=WorkoutCB(action="panel").pack()
@@ -190,6 +211,29 @@ def set_entry_keyboard(
         InlineKeyboardButton(
             text=ru.BTN_WORKOUT_FINISH, callback_data=WorkoutCB(action="finish").pack()
         ),
+    )
+    return builder.as_markup()
+
+
+def technique_keyboard(exercise_id: int, *, is_favourite: bool) -> InlineKeyboardMarkup:
+    """Under the technique card, shown mid-set.
+
+    The way back is to the set being done, not to the catalogue: this screen
+    is opened between reps, and landing in a browse list afterwards is how
+    the previous version lost people.
+    """
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text=ru.BTN_WORKOUT_UNFAV if is_favourite else ru.BTN_WORKOUT_FAV,
+            callback_data=WorkoutFavCB().pack(),
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text=ru.BTN_WORKOUT_BACK_TO_SET,
+            callback_data=WorkoutExerciseCB(exercise_id=exercise_id).pack(),
+        )
     )
     return builder.as_markup()
 

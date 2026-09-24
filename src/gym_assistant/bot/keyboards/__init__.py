@@ -37,12 +37,14 @@ from gym_assistant.bot.keyboards.workouts import (
     SetCommitCB,
     WorkoutCB,
     WorkoutExerciseCB,
+    WorkoutFavCB,
     WorkoutSearchPageCB,
     back_to_panel_keyboard,
     panel_keyboard,
     search_results_keyboard,
     set_entry_keyboard,
     start_keyboard,
+    technique_keyboard,
 )
 
 __all__ = [
@@ -65,6 +67,7 @@ __all__ = [
     "SkipCB",
     "WorkoutCB",
     "WorkoutExerciseCB",
+    "WorkoutFavCB",
     "WorkoutSearchPageCB",
     "back_to_panel_keyboard",
     "cancel_button",
@@ -86,6 +89,7 @@ __all__ = [
     "sex_keyboard",
     "skip_keyboard",
     "start_keyboard",
+    "technique_keyboard",
     "undo_hide_keyboard",
     "with_cancel",
 ]
