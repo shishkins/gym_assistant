@@ -108,6 +108,23 @@ jobs:
               | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
+            # Before pulling, not after: the pull is what runs out of room,
+            # and a disk that is already full fails it. Every deploy leaves
+            # its predecessor behind at 1.3 GB a piece; twenty-two of them
+            # filled a 25 GB disk in three weeks, and the failure looked
+            # nothing like "no space" - the bot simply stayed on the old
+            # image while the migration reported success.
+            #
+            # The two newest are kept so a rollback has something to roll
+            # back to; everything older goes. Images in use by a running
+            # container cannot be removed, so this cannot take the bot down.
+            docker image ls 'ghcr.io/${{ github.repository }}-bot' \
+              --format '{{.ID}} {{.CreatedAt}}' \
+              | sort -k2 -r | tail -n +3 | awk '{print $1}' \
+              | xargs -r docker rmi >/dev/null 2>&1 || true
+            docker builder prune -af >/dev/null 2>&1 || true
+            df -h / | tail -1
+
             docker compose pull bot
 
             # Before the migration, not after: a migration that corrupts data
