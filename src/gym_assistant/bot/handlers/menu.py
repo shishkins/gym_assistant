@@ -13,6 +13,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.bot.handlers.exercises import show_menu
+from gym_assistant.bot.handlers.meals import show_today
 from gym_assistant.bot.handlers.measurements import prompt_weight, send_photos
 from gym_assistant.bot.handlers.profile import show_card
 from gym_assistant.bot.handlers.stats import open_stats_menu
@@ -48,6 +49,9 @@ async def menu_action(
     match callback_data.action:
         case "workout":
             await open_workout_panel(message, state, session, user)
+        case "food":
+            await state.clear()
+            await show_today(message, session, user)
         case "stats":
             await open_stats_menu(message, state, session, user)
         case "exercises":

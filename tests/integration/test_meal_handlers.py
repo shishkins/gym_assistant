@@ -43,17 +43,26 @@ def _item(name: str = "Фо бо", grams: str = "650", **extra: Any) -> SeenItem
     return SeenItem(name=name, grams=Decimal(grams), **defaults)
 
 
-class StubVision:
-    """Answers without looking at anything."""
+def _seen(*items: SeenItem) -> Seen:
+    return Seen(
+        kind="food",
+        items=items or (_item(),),
+        question=None,
+        model="claude-sonnet-5",
+        prompt_version="food-v3",
+    )
 
-    def __init__(self, seen: Seen | None = None) -> None:
-        self.seen = seen or Seen(
-            kind="food",
-            items=(_item(),),
-            question=None,
-            model="claude-sonnet-5",
-            prompt_version="food-v3",
-        )
+
+class StubVision:
+    """Answers without looking at anything.
+
+    Takes a sequence, because a clarification is supposed to CHANGE the
+    answer - and a stub that says the same thing twice cannot show whether
+    the first reading was kept or quietly replaced.
+    """
+
+    def __init__(self, *answers: Seen) -> None:
+        self.answers = list(answers) or [_seen()]
         self.calls: list[dict[str, Any]] = []
 
     @property
@@ -62,7 +71,8 @@ class StubVision:
 
     async def look(self, image: bytes, **kwargs: Any) -> Seen:
         self.calls.append(kwargs)
-        return self.seen
+        index = min(len(self.calls) - 1, len(self.answers) - 1)
+        return self.answers[index]
 
 
 @pytest_asyncio.fixture
@@ -248,3 +258,92 @@ async def test_a_photo_from_someone_without_a_subscription_costs_nothing(
     await plain.send_photo()
 
     assert vision.calls == []
+
+
+# --- what makes the measurement possible ----------------------------------
+
+
+async def test_the_first_reading_survives_a_clarification(
+    bot: BotHarness, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The guess being measured is what the model said from the photo alone.
+
+    A clarification is meant to replace the answer - that is its job - and the
+    first reading has to sit outside what it replaces. Without this the diary
+    holds only corrected numbers: all of them right, and useless for working
+    out how far off the model was. The person is weighing portions and sending
+    delivery screenshots for exactly this measurement, so losing the "before"
+    wastes their work rather than ours.
+    """
+    stub = StubVision(_seen(_item(grams="650")), _seen(_item(grams="400")))
+    monkeypatch.setattr(meal_handlers, "build_vision", lambda *_: stub)
+
+    await bot.send_photo()
+    await bot.send_photo()  # the delivery screenshot
+    await bot.tap_button("Записать")
+
+    meal = await MealService(session).last(await _user_id(session))
+    assert meal is not None
+    assert meal.first_pass is not None
+
+    guessed = Decimal(meal.first_pass["items"][0]["grams"])
+    assert guessed == Decimal("650"), "первая оценка затёрта уточнением"
+    assert meal.items[0].grams == Decimal("400.0"), "уточнённое значение не сохранилось"
+
+
+async def test_a_corrected_portion_does_not_disturb_the_first_reading(
+    bot: BotHarness, session: AsyncSession, vision: StubVision
+) -> None:
+    await bot.send_photo()
+    await bot.tap_button("2 порции")
+    await bot.tap_button("Записать")
+
+    meal = await MealService(session).last(await _user_id(session))
+    assert meal is not None
+    assert Decimal(meal.first_pass["items"][0]["grams"]) == Decimal("650")
+    assert meal.items[0].grams == Decimal("1300.0")
+
+
+async def test_a_photo_sent_after_the_card_clarifies_it(
+    bot: BotHarness, session: AsyncSession, vision: StubVision
+) -> None:
+    """Photograph the plate, then send the delivery screenshot - the order the
+    person actually described. Requiring a button press between them taxes the
+    one habit worth encouraging."""
+    await bot.send_photo()
+    await bot.send_photo()
+
+    assert len(vision.calls) == 2
+    assert vision.calls[1]["extra"] is not None, "второе фото не доехало до модели"
+    assert vision.calls[1]["previous"], "модель не получила, что уже разобрала"
+    assert await _meals(session) == []
+
+
+async def test_the_meal_records_which_help_was_used(
+    bot: BotHarness, session: AsyncSession, vision: StubVision
+) -> None:
+    """A portion read off a delivery screenshot is worth more than one judged
+    against a plate, so the two have to be tellable apart later."""
+    await bot.send_photo()
+    await bot.send_photo()
+    await bot.tap_button("Записать")
+
+    meal = await MealService(session).last(await _user_id(session))
+    assert meal is not None
+    assert meal.hints is not None
+    assert meal.hints["used"][0]["photo"] is True
+
+
+async def test_a_written_hint_reaches_the_model_and_is_recorded(
+    bot: BotHarness, session: AsyncSession, vision: StubVision
+) -> None:
+    await bot.send_photo()
+    await bot.tap_button("Уточнить")
+    await bot.send("тарелка 30 см")
+    await bot.tap_button("Записать")
+
+    assert vision.calls[1]["note"] == "тарелка 30 см"
+
+    meal = await MealService(session).last(await _user_id(session))
+    assert meal is not None
+    assert meal.hints["used"][0]["text"] == "тарелка 30 см"

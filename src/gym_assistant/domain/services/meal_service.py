@@ -56,6 +56,8 @@ class MealService:
         note: str | None = None,
         model: str | None = None,
         prompt_version: str | None = None,
+        first_pass: dict[str, object] | None = None,
+        hints: dict[str, object] | None = None,
         eaten_at: datetime | None = None,
     ) -> Meal:
         """Writes a confirmed meal and its items in one go.
@@ -71,6 +73,8 @@ class MealService:
             note=note,
             model=model,
             prompt_version=prompt_version,
+            first_pass=first_pass,
+            hints=hints,
         )
 
         for index, entry in enumerate(items):

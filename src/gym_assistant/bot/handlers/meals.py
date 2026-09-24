@@ -116,7 +116,7 @@ async def handle_food_photo(
         return True
 
     await notice.delete()
-    await _show(message, state, seen, file_id)
+    await _show(message, state, seen, file_id, first=True)
     return True
 
 
@@ -130,8 +130,25 @@ async def _recent_hint(session: AsyncSession, user: User) -> list[str]:
 
 
 async def _show(
-    message: Message, state: FSMContext, seen: Seen, file_id: str, edit: Message | None = None
+    message: Message,
+    state: FSMContext,
+    seen: Seen,
+    file_id: str,
+    *,
+    first: bool = False,
+    hint: dict[str, object] | None = None,
 ) -> None:
+    """Puts the breakdown on screen and keeps it in the dialogue state.
+
+    ``first`` marks the reading made from the photo alone. It is stored
+    untouched and never updated again: it is the guess being measured, and a
+    guess that gets corrected after the fact measures nothing.
+    """
+    data = await state.get_data() if not first else {}
+    hints = list(data.get("hints", []))
+    if hint is not None:
+        hints.append(hint)
+
     await state.set_state(MealFlow.reviewing)
     await state.update_data(
         items=[_as_data(item) for item in seen.items],
@@ -139,13 +156,15 @@ async def _show(
         model=seen.model,
         prompt_version=seen.prompt_version,
         question=seen.question,
+        hints=hints,
+        first_pass=(
+            {"items": [_as_data(item) for item in seen.items], "model": seen.model}
+            if first
+            else data.get("first_pass")
+        ),
     )
 
-    text = _card(seen.items, seen.question)
-    if edit is not None:
-        await edit.edit_text(text, reply_markup=meal_card_keyboard())
-        return
-    await message.answer(text, reply_markup=meal_card_keyboard())
+    await message.answer(_card(seen.items, seen.question), reply_markup=meal_card_keyboard())
 
 
 def _card(items: Sequence[SeenItem], question: str | None) -> str:
@@ -230,6 +249,8 @@ async def save_meal(
         photo_file_id=data.get("photo_file_id"),
         model=data.get("model"),
         prompt_version=data.get("prompt_version"),
+        first_pass=data.get("first_pass"),
+        hints={"used": data.get("hints") or []},
     )
     await state.clear()
     await callback.answer()
@@ -290,10 +311,19 @@ async def clarify_with_text(
 
 
 @router.message(MealFlow.clarifying, F.photo)
+@router.message(MealFlow.reviewing, F.photo)
 async def clarify_with_photo(
     message: Message, state: FSMContext, session: AsyncSession, user: User, settings: Settings
 ) -> None:
-    """A second photo: a menu, a delivery app, or the plate next to a fork."""
+    """A second photo: a menu, a delivery app, or the plate next to a fork.
+
+    Accepted while the card is merely on screen, not only after tapping
+    "уточнить": the natural move is to photograph the plate and then send the
+    delivery screenshot straight after, and making that cost a button press
+    first is a tax on the one habit worth encouraging. Only an unconfirmed
+    card captures the next photo - once it is saved the state is clear and a
+    photo starts a new meal.
+    """
     assert message.photo is not None
     extra = await _download(message, message.photo[-1].file_id)
     await _rethink(
@@ -339,7 +369,13 @@ async def _rethink(
         return
 
     await notice.delete()
-    await _show(message, state, seen, str(file_id))
+    await _show(
+        message,
+        state,
+        seen,
+        str(file_id),
+        hint={"photo": extra_image is not None, "text": hint_text or None},
+    )
 
 
 async def _download(message: Message, file_id: str) -> bytes:
@@ -356,6 +392,12 @@ async def _download(message: Message, file_id: str) -> bytes:
 
 @router.message(Command("food"))
 async def cmd_food(message: Message, session: AsyncSession, user: User) -> None:
+    await show_today(message, session, user)
+
+
+async def show_today(message: Message, session: AsyncSession, user: User) -> None:
+    """The day so far. Also the menu's entry point, because a feature whose
+    only door is "send a photo and hope" is a feature nobody finds."""
     service = MealService(session)
     totals = await service.day_totals(user.id, days=1)
     if not totals:

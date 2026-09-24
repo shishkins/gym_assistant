@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -706,6 +707,18 @@ class Meal(Base, TimestampMixin):
     # cannot absorb - so the history has to say where the seam is.
     model: Mapped[str | None] = mapped_column(Text)
     prompt_version: Mapped[str | None] = mapped_column(Text)
+
+    # What the model said from the photo ALONE, before any hint and before any
+    # portion was corrected. The columns above hold the agreed answer; this
+    # holds the guess, and the difference between them is the only measurement
+    # of accuracy this system will ever produce. Running one photo twice says
+    # whether the model agrees with itself; only this says whether it was
+    # right.
+    first_pass: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # Which of the four ways were used, so the readings can be told apart: a
+    # portion read off a delivery screenshot is worth more than one judged
+    # against a plate.
+    hints: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     items: Mapped[list[MealItem]] = relationship(
         back_populates="meal",
