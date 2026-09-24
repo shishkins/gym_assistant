@@ -27,17 +27,20 @@ async def _save_weight(message: Message, session: AsyncSession, user: User, valu
     service = MeasurementService(session)
     await service.record(user.id, weight_kg=value)
 
+    units = user.unit_system
     delta = await service.weight_change(user.id, days=30)
-    shown = render.format_decimal(value)
+    shown = render.format_weight(value, units)
 
     if delta is None:
         await message.answer(ru.WEIGHT_SAVED.format(weight=shown))
         return
 
+    # A difference converts like a weight, because it is one: both ends of the
+    # subtraction were kilograms.
     if delta > 0:
-        wording = ru.WEIGHT_DELTA_UP.format(value=render.format_decimal(delta))
+        wording = ru.WEIGHT_DELTA_UP.format(value=render.format_weight(delta, units))
     elif delta < 0:
-        wording = ru.WEIGHT_DELTA_DOWN.format(value=render.format_decimal(-delta))
+        wording = ru.WEIGHT_DELTA_DOWN.format(value=render.format_weight(-delta, units))
     else:
         wording = ru.WEIGHT_DELTA_SAME
 
@@ -55,11 +58,9 @@ async def cmd_weight(
     """``/weight 82.5`` records straight away; bare ``/weight`` asks."""
     if command.args:
         try:
-            value = parse_weight(command.args)
+            value = parse_weight(command.args, user.unit_system)
         except ValueParseError as exc:
-            await message.answer(
-                ru.ERROR_WEIGHT_FORMAT if exc.reason == "format" else ru.ERROR_WEIGHT_RANGE
-            )
+            await message.answer(render.weight_error(exc.reason, user.unit_system))
             return
         await _save_weight(message, session, user, value)
         return
@@ -75,32 +76,29 @@ async def prompt_weight(
     last = await service.latest_weigh_in(user.id)
     await state.set_state(WeightEntry.value)
 
+    units = user.unit_system
     keyboard = cancel_keyboard("weight").as_markup()
     if last is not None and last.weight_kg is not None:
         await message.answer(
-            ru.WEIGHT_PROMPT_WITH_LAST.format(
-                last=render.format_decimal(last.weight_kg),
-                when=render.format_when(last.measured_at),
-            ),
+            render.weight_prompt_with_last(last.weight_kg, last.measured_at, units),
             reply_markup=keyboard,
         )
     else:
-        await message.answer(ru.WEIGHT_PROMPT, reply_markup=keyboard)
+        await message.answer(render.weight_prompt(units), reply_markup=keyboard)
 
 
 @router.message(WeightEntry.value)
 async def weight_entered(
     message: Message, state: FSMContext, session: AsyncSession, user: User
 ) -> None:
+    units = user.unit_system
     if not message.text:
-        await message.answer(ru.ERROR_WEIGHT_FORMAT)
+        await message.answer(render.weight_error("format", units))
         return
     try:
-        value = parse_weight(message.text)
+        value = parse_weight(message.text, units)
     except ValueParseError as exc:
-        await message.answer(
-            ru.ERROR_WEIGHT_FORMAT if exc.reason == "format" else ru.ERROR_WEIGHT_RANGE
-        )
+        await message.answer(render.weight_error(exc.reason, units))
         return
 
     await state.clear()
@@ -120,7 +118,7 @@ async def photo_received(message: Message, session: AsyncSession, user: User) ->
     weight: Decimal | None = None
     if message.caption:
         try:
-            weight = parse_weight(message.caption)
+            weight = parse_weight(message.caption, user.unit_system)
         except ValueParseError:
             weight = None  # a caption is free-form; a non-number is fine
 
@@ -133,7 +131,7 @@ async def photo_received(message: Message, session: AsyncSession, user: User) ->
 
     if weight is not None:
         await message.answer(
-            ru.PHOTO_SAVED_WITH_WEIGHT.format(weight=render.format_decimal(weight))
+            ru.PHOTO_SAVED_WITH_WEIGHT.format(weight=render.format_weight(weight, user.unit_system))
         )
     else:
         await message.answer(ru.PHOTO_SAVED)
@@ -162,7 +160,7 @@ async def send_photos(message: Message, session: AsyncSession, user: User) -> No
         when = render.format_when(measurement.measured_at)
         caption = (
             ru.PHOTO_CAPTION_WITH_WEIGHT.format(
-                date=when, weight=render.format_decimal(measurement.weight_kg)
+                date=when, weight=render.format_weight(measurement.weight_kg, user.unit_system)
             )
             if measurement.weight_kg is not None
             else ru.PHOTO_CAPTION.format(date=when)

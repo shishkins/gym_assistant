@@ -178,6 +178,16 @@ class User(Base, TimestampMixin):
         lazy="raise",
     )
 
+    @property
+    def unit_system(self) -> Units:
+        """``units``, typed.
+
+        The column is a plain string so the CHECK constraint can police it in
+        SQL, but every reader wants the enum - and a bare ``Units(user.units)``
+        at two dozen call sites is two dozen places to get the cast wrong.
+        """
+        return Units(self.units)
+
     def __repr__(self) -> str:
         return f"<User id={self.id} telegram_id={self.telegram_id}>"
 

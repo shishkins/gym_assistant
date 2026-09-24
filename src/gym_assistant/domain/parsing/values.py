@@ -12,6 +12,8 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Literal
 
+from gym_assistant.domain.units import Units, to_kg, weight_bounds
+
 Reason = Literal["format", "range"]
 
 
@@ -52,9 +54,16 @@ def parse_decimal(
     return value.quantize(Decimal(1).scaleb(-decimals))
 
 
-def parse_weight(raw: str) -> Decimal:
-    """Body weight in kilograms."""
-    return parse_decimal(raw, minimum=20, maximum=400, decimals=2)
+def parse_weight(raw: str, units: Units = Units.METRIC) -> Decimal:
+    """Body weight: typed in the user's system, returned in kilograms.
+
+    The conversion belongs here rather than at the call sites. This is the
+    border - past it everything is metric, and there are four handlers that
+    read a weight, one of which would eventually forget to convert.
+    """
+    minimum, maximum = weight_bounds(units)
+    value = parse_decimal(raw, minimum=minimum, maximum=maximum, decimals=2)
+    return to_kg(value, units)
 
 
 def parse_height(raw: str) -> int:

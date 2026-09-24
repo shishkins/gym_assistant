@@ -10,7 +10,7 @@ from urllib.parse import quote_plus
 from gym_assistant.bot.texts import ru
 from gym_assistant.domain.models import Equipment, Exercise, ExerciseType, WorkoutSet
 from gym_assistant.domain.services import ExerciseHistory, ProfileSummary, WorkoutSummary
-from gym_assistant.domain.units import Units, from_kg, label
+from gym_assistant.domain.units import Units, from_kg, label, weight_bounds
 
 
 def format_decimal(value: Decimal) -> str:
@@ -35,6 +35,36 @@ def format_weight(kg: Decimal, units: Units = Units.METRIC) -> str:
     the wrong number under the wrong label.
     """
     return f"{format_decimal(from_kg(kg, units))} {label(units)}"
+
+
+def weight_error(reason: str, units: Units) -> str:
+    """The parser's ``reason`` as a sentence, in the units it was typed in.
+
+    Both messages quote numbers - an example and a range - and both of those
+    numbers are wrong in the other system. This lived as an inline ternary in
+    four handlers; that is four places to quote kilograms at someone who
+    types pounds.
+    """
+    if reason == "format":
+        return ru.ERROR_WEIGHT_FORMAT.format(example=ru.WEIGHT_EXAMPLES[units.value])
+    low, high = weight_bounds(units)
+    return ru.ERROR_WEIGHT_RANGE.format(
+        min=format_decimal(low), max=format_decimal(high), unit=label(units)
+    )
+
+
+def weight_prompt(units: Units) -> str:
+    return ru.WEIGHT_PROMPT.format(unit=label(units), example=ru.WEIGHT_EXAMPLES[units.value])
+
+
+def weight_prompt_with_last(last: Decimal, when: datetime, units: Units) -> str:
+    return ru.WEIGHT_PROMPT_WITH_LAST.format(
+        unit=label(units), last=format_weight(last, units), when=format_when(when)
+    )
+
+
+def onboarding_weight_prompt(units: Units) -> str:
+    return ru.ONBOARDING_WEIGHT.format(unit=label(units), example=ru.WEIGHT_EXAMPLES[units.value])
 
 
 def format_date(value: date) -> str:
@@ -87,6 +117,10 @@ def render_profile(summary: ProfileSummary, units: Units = Units.METRIC) -> str:
 
     if summary.measurements_count:
         lines.append(f"\nЗамеров в истории: {summary.measurements_count}")
+
+    # Shown in metric too: without it the switch button has nothing to switch
+    # away from, and a stray tap becomes unexplainable.
+    lines.append("\n" + ru.PROFILE_UNITS.format(unit=label(units)))
 
     return "\n".join(lines)
 
@@ -280,7 +314,9 @@ def render_workout_summary(summary: WorkoutSummary, units: Units = Units.METRIC)
     if summary.records:
         text += ru.WORKOUT_FINISHED_RECORDS.format(
             records="\n".join(
-                ru.WORKOUT_RECORD_LINE.format(name=exercise.name_ru, best=format_decimal(best))
+                ru.WORKOUT_RECORD_LINE.format(
+                    name=exercise.name_ru, best=format_weight(best, units)
+                )
                 for exercise, best in summary.records
             )
         )

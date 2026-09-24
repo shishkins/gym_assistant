@@ -111,7 +111,9 @@ class AiAssistant:
         if left <= 0:
             raise BudgetExceededError(str(left))
 
-        opening = "\n".join(filter(None, [brief(ctx.user.first_name), question])).strip()
+        opening = "\n".join(
+            filter(None, [brief(ctx.user.first_name, ctx.user.unit_system), question])
+        ).strip()
         messages: list[dict[str, Any]] = [
             *(history or []),
             {"role": "user", "content": opening},

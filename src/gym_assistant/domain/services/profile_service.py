@@ -13,6 +13,7 @@ from gym_assistant.domain.models import ExperienceLevel, Goal, Sex, User, UserPr
 from gym_assistant.domain.parsing import calculate_age
 from gym_assistant.domain.repositories import MeasurementRepository, UserRepository
 from gym_assistant.domain.rules import bmi_category, calculate_bmi
+from gym_assistant.domain.units import Units
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +129,20 @@ class ProfileService:
         setattr(profile, field, None)
         await self._session.flush()
         return profile
+
+    async def set_units(self, user_id: int, units: Units) -> User:
+        """Switches the display system.
+
+        On ``users`` rather than on the profile because it is a preference like
+        ``locale``, not a fact about a body - and because the profile can be
+        empty while this still has to hold a value.
+        """
+        user = await self._users.get(user_id)
+        if user is None:
+            raise LookupError(f"user {user_id} does not exist")
+        user.units = units.value
+        await self._session.flush()
+        return user
 
     async def get_summary(self, user_id: int, *, today: date) -> ProfileSummary:
         user = await self._users.get(user_id)

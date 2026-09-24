@@ -18,6 +18,7 @@ from gym_assistant.bot.keyboards import (
     cancel_keyboard,
     experience_keyboard,
     goal_keyboard,
+    other_units,
     profile_keyboard,
     sex_keyboard,
 )
@@ -31,6 +32,7 @@ from gym_assistant.domain.parsing import (
 )
 from gym_assistant.domain.repositories import StatsRepository
 from gym_assistant.domain.services import ProfileService
+from gym_assistant.domain.units import label as unit_label
 
 router = Router(name="profile")
 
@@ -47,8 +49,9 @@ PROFILE_RECORD_COUNT = 3
 
 
 async def show_card(message: Message, session: AsyncSession, user: User) -> None:
+    units = user.unit_system
     summary = await ProfileService(session).get_summary(user.id, today=date.today())
-    text = render.render_profile(summary)
+    text = render.render_profile(summary, units)
 
     # Requested during the iteration 3 review: the maxima belong on the card,
     # not only behind a report.
@@ -59,14 +62,18 @@ async def show_card(message: Message, session: AsyncSession, user: User) -> None
             records="\n".join(
                 ru.PROFILE_RECORD_LINE.format(
                     name=record.exercise_name,
-                    weight=render.format_decimal(record.best_weight) if record.best_weight else "—",
+                    weight=(
+                        render.format_weight(record.best_weight, units)
+                        if record.best_weight
+                        else "—"
+                    ),
                     reps=record.best_weight_reps or "—",
                 )
                 for record in records
             )
         )
 
-    await message.answer(text, reply_markup=profile_keyboard())
+    await message.answer(text, reply_markup=profile_keyboard(units))
 
 
 @router.message(Command("profile"))
@@ -79,6 +86,8 @@ async def edit_requested(
     callback: CallbackQuery,
     callback_data: EditCB,
     state: FSMContext,
+    session: AsyncSession,
+    user: User,
 ) -> None:
     field = callback_data.field
     message = callback.message
@@ -86,9 +95,16 @@ async def edit_requested(
     if not isinstance(message, Message):
         return
 
+    if field == "units":
+        await _switch_units(message, session, user)
+        return
+
     if field == "weight":
         await state.set_state(WeightEntry.value)
-        await message.answer(ru.WEIGHT_PROMPT, reply_markup=cancel_keyboard("weight").as_markup())
+        await message.answer(
+            render.weight_prompt(user.unit_system),
+            reply_markup=cancel_keyboard("weight").as_markup(),
+        )
         return
 
     if field in CHOICE_KEYBOARDS:
@@ -106,6 +122,21 @@ async def edit_requested(
         ru.PROFILE_FIELD_PROMPTS[field],
         reply_markup=cancel_keyboard("profile_edit").as_markup(),
     )
+
+
+async def _switch_units(message: Message, session: AsyncSession, user: User) -> None:
+    """Flips the display system and redraws the card in it.
+
+    Nothing in the history is touched - the rows were kilograms before the tap
+    and are kilograms after it. What changes is the two borders: what a typed
+    number means, and what a stored one looks like. Saying so in the
+    confirmation is the point, because "переключил" next to every past number
+    suddenly reading 181 instead of 82 looks like data loss.
+    """
+    target = other_units(user.unit_system)
+    await ProfileService(session).set_units(user.id, target)
+    await message.answer(ru.UNITS_SWITCHED.format(unit=unit_label(target)))
+    await show_card(message, session, user)
 
 
 @router.callback_query(ChoiceCB.filter())

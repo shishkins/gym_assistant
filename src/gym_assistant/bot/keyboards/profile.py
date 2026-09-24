@@ -8,6 +8,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from gym_assistant.bot.texts import ru
 from gym_assistant.domain.models import ExperienceLevel, Goal, Sex
+from gym_assistant.domain.units import Units
+from gym_assistant.domain.units import label as unit_label
 
 
 class ChoiceCB(CallbackData, prefix="ch"):
@@ -71,7 +73,7 @@ def skip_keyboard(field: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def profile_keyboard() -> InlineKeyboardMarkup:
+def profile_keyboard(units: Units = Units.METRIC) -> InlineKeyboardMarkup:
     """Every field on the card is a button that edits it."""
     builder = InlineKeyboardBuilder()
     builder.button(text="Пол", callback_data=EditCB(field="sex"))
@@ -80,8 +82,19 @@ def profile_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="Цель", callback_data=EditCB(field="goal"))
     builder.button(text="Опыт", callback_data=EditCB(field="experience_level"))
     builder.button(text="Записать вес", callback_data=EditCB(field="weight"))
-    builder.adjust(2, 2, 2)
+    # One button rather than a two-option picker: with exactly two systems the
+    # picker would always show one live option and one no-op.
+    builder.button(
+        text=ru.BTN_UNITS_SWITCH.format(unit=unit_label(other_units(units))),
+        callback_data=EditCB(field="units"),
+    )
+    builder.adjust(2, 2, 2, 1)
     return builder.as_markup()
+
+
+def other_units(units: Units) -> Units:
+    """The system the switch leads to."""
+    return Units.METRIC if units is Units.IMPERIAL else Units.IMPERIAL
 
 
 CHOICE_ENUMS: dict[str, type[Sex] | type[Goal] | type[ExperienceLevel]] = {

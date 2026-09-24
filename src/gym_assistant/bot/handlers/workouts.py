@@ -39,6 +39,7 @@ from gym_assistant.domain.services import (
     NoOpenWorkoutError,
     WorkoutService,
 )
+from gym_assistant.domain.units import Units, from_kg, to_kg
 
 log = structlog.get_logger(__name__)
 router = Router(name="workouts")
@@ -62,6 +63,7 @@ async def _panel(service: WorkoutService, user: User) -> tuple[str, InlineKeyboa
         sets=[item for _, items in summary.by_exercise for item in items],
         tonnage=summary.tonnage,
         by_exercise=summary.by_exercise,
+        units=user.unit_system,
     )
     return text, panel_keyboard(frequent)
 
@@ -94,13 +96,15 @@ async def _exercise_panel(
         reps=reps,
     )
 
-    text = render.render_exercise_panel(history, today, weight=weight, reps=reps)
+    units = user.unit_system
+    text = render.render_exercise_panel(history, today, weight=weight, reps=reps, units=units)
     is_favourite = await ExerciseService(service.session).is_favourite(user.id, exercise.id)
     return text, set_entry_keyboard(
         weight=weight,
         reps=reps,
         can_repeat=bool(today),
         is_favourite=is_favourite,
+        units=units,
     )
 
 
@@ -146,7 +150,7 @@ async def cmd_last(message: Message, session: AsyncSession, user: User) -> None:
         await message.answer(ru.WORKOUT_LAST_NONE)
         return
     header = ru.WORKOUT_LAST_HEADER.format(when=render.format_when(summary.workout.started_at))
-    await message.answer(header + render.render_workout_summary(summary))
+    await message.answer(header + render.render_workout_summary(summary, user.unit_system))
 
 
 # --- session actions ------------------------------------------------------
@@ -280,7 +284,9 @@ async def _undo(
         await message.answer(ru.WORKOUT_NOTHING_TO_UNDO)
         return
 
-    await message.answer(ru.WORKOUT_SET_UNDONE.format(value=render.render_set_value(removed)))
+    await message.answer(
+        ru.WORKOUT_SET_UNDONE.format(value=render.render_set_value(removed, user.unit_system))
+    )
     text, markup = await _panel(service, user)
     await message.answer(text, reply_markup=markup)
 
@@ -293,7 +299,11 @@ async def _finish(
     if summary is None:
         await _edit(callback, ru.WORKOUT_NONE_OPEN, start_keyboard(is_open=False))
         return
-    await _edit(callback, render.render_workout_summary(summary), start_keyboard(is_open=False))
+    await _edit(
+        callback,
+        render.render_workout_summary(summary, user.unit_system),
+        start_keyboard(is_open=False),
+    )
 
 
 # --- choosing an exercise -------------------------------------------------
@@ -395,9 +405,13 @@ async def adjust_set(
         return
 
     if callback_data.field == "weight":
+        # Out of storage, add, back into storage. Adding a converted step to
+        # kilograms instead would drift: +5 lbs is 2.27 kg, and twenty taps of
+        # that is a number nobody typed.
+        units = user.unit_system
         current = Decimal(data["weight"]) if data.get("weight") is not None else Decimal(0)
-        updated = max(Decimal(0), current + Decimal(callback_data.delta))
-        await state.update_data(weight=str(updated))
+        shown = max(Decimal(0), from_kg(current, units) + Decimal(callback_data.delta))
+        await state.update_data(weight=str(to_kg(shown, units)))
     else:
         reps = max(1, int(data.get("reps") or DEFAULT_REPS) + int(callback_data.delta))
         await state.update_data(reps=reps)
@@ -450,7 +464,7 @@ async def typed_set(message: Message, state: FSMContext, session: AsyncSession, 
     """Free text during a session is a set - the fastest path there is."""
     assert message.text is not None
     try:
-        parsed = parse_set_entry(message.text)
+        parsed = parse_set_entry(message.text, user.unit_system)
     except ValueParseError as exc:
         await message.answer(
             ru.WORKOUT_SET_FORMAT_ERROR if exc.reason == "format" else ru.WORKOUT_SET_RANGE_ERROR
@@ -502,19 +516,20 @@ async def _store(
         await message.answer(ru.WORKOUT_SET_FORMAT_ERROR)
         return
 
-    await message.answer(_confirmation(logged.sets))
+    units = user.unit_system
+    await message.answer(_confirmation(logged.sets, units))
     if logged.is_record:
-        value = render.render_set_value(logged.sets[0])
+        value = render.render_set_value(logged.sets[0], units)
         text = (
             ru.WORKOUT_RECORD.format(value=value)
             if logged.previous_best is None
             else ru.WORKOUT_RECORD_BEATEN.format(
-                value=value, previous=render.format_decimal(logged.previous_best)
+                value=value, previous=render.format_weight(logged.previous_best, units)
             )
         )
         if logged.estimate is not None:
             text += ru.WORKOUT_RECORD_ESTIMATE.format(
-                estimate=render.format_decimal(logged.estimate)
+                estimate=render.format_weight(logged.estimate, units)
             )
         await message.answer(text)
 
@@ -528,8 +543,8 @@ async def _store(
     await message.answer(text, reply_markup=markup)
 
 
-def _confirmation(stored: list[WorkoutSet]) -> str:
-    value = render.render_set_value(stored[0])
+def _confirmation(stored: list[WorkoutSet], units: Units = Units.METRIC) -> str:
+    value = render.render_set_value(stored[0], units)
     if len(stored) == 1:
         return ru.WORKOUT_SET_SAVED.format(value=value)
     return ru.WORKOUT_SETS_SAVED.format(count=len(stored), value=value)

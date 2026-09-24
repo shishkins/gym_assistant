@@ -35,6 +35,7 @@ from gym_assistant.analytics.metrics import (
 from gym_assistant.domain.models import User
 from gym_assistant.domain.repositories import MeasurementRepository, StatsRepository
 from gym_assistant.domain.services import ExerciseService, ProfileService, WorkoutService
+from gym_assistant.domain.units import Units, from_kg
 
 log = structlog.get_logger(__name__)
 
@@ -386,7 +387,35 @@ async def run_tool(ctx: ToolContext, name: str, arguments: dict[str, Any]) -> di
         log.info("ai_tool_extra_args", tool=name, dropped=sorted(set(arguments) - allowed))
 
     result: dict[str, Any] = await handler(ctx, **clean)  # type: ignore[operator]
-    return result
+    converted: dict[str, Any] = _in_user_units(result, ctx.user.unit_system)
+    return converted
+
+
+def _in_user_units(value: Any, units: Units) -> Any:
+    """Rewrites every ``*_kg`` key into the user's system, wherever it sits.
+
+    One seam, for the same reason ``format_weight`` is one seam on the screen.
+    The alternative is converting at each of a dozen dict literals, several of
+    them nested inside a loop - a dozen chances to miss one, and a missed one
+    hands the model kilograms while the label says pounds.
+
+    The key carries the unit rather than a separate field: a number named
+    ``top_weight_lbs`` cannot be misread, and there is nothing for the model to
+    correlate wrongly.
+    """
+    if units is Units.METRIC:
+        return value
+    if isinstance(value, dict):
+        converted = {}
+        for key, item in value.items():
+            if key.endswith("_kg") and isinstance(item, int | float):
+                converted[f"{key[:-3]}_lbs"] = _money(from_kg(Decimal(str(item)), units))
+            else:
+                converted[key] = _in_user_units(item, units)
+        return converted
+    if isinstance(value, list):
+        return [_in_user_units(item, units) for item in value]
+    return value
 
 
 def _allowed_arguments(name: str) -> set[str]:

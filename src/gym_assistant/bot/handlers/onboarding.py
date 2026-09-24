@@ -34,6 +34,7 @@ from gym_assistant.domain.parsing import (
     parse_weight,
 )
 from gym_assistant.domain.services import MeasurementService, ProfileService
+from gym_assistant.domain.units import Units
 
 log = structlog.get_logger(__name__)
 router = Router(name="onboarding")
@@ -46,7 +47,7 @@ def _next_step(current: str) -> str | None:
     return STEPS[index] if index < len(STEPS) else None
 
 
-async def ask(step: str, message: Message, state: FSMContext) -> None:
+async def ask(step: str, message: Message, state: FSMContext, user: User | None = None) -> None:
     """Poses the question for ``step`` and parks the FSM there."""
     await state.set_state(getattr(Onboarding, step))
 
@@ -60,7 +61,14 @@ async def ask(step: str, message: Message, state: FSMContext) -> None:
         case "goal":
             await message.answer(ru.ONBOARDING_GOAL, reply_markup=goal_keyboard())
         case "weight":
-            await message.answer(ru.ONBOARDING_WEIGHT, reply_markup=skip_keyboard("weight"))
+            # A fresh user is metric by default, so ``user`` being absent is
+            # the same answer - but /profile can have flipped it before the
+            # wizard is finished or restarted.
+            units = user.unit_system if user is not None else Units.METRIC
+            await message.answer(
+                render.onboarding_weight_prompt(units),
+                reply_markup=skip_keyboard("weight"),
+            )
 
 
 async def start(message: Message, state: FSMContext) -> None:
@@ -73,7 +81,7 @@ async def _advance(
 ) -> None:
     following = _next_step(current)
     if following is not None:
-        await ask(following, message, state)
+        await ask(following, message, state, user)
         return
 
     await state.clear()
@@ -81,7 +89,9 @@ async def _advance(
     if summary.is_empty:
         await message.answer(ru.ONBOARDING_DONE_EMPTY)
     else:
-        await message.answer(ru.ONBOARDING_DONE.format(summary=render.render_profile(summary)))
+        await message.answer(
+            ru.ONBOARDING_DONE.format(summary=render.render_profile(summary, user.unit_system))
+        )
 
 
 async def _strip_keyboard(callback: CallbackQuery, chosen: str | None) -> Message | None:
@@ -206,15 +216,14 @@ async def height_entered(
 async def weight_entered(
     message: Message, state: FSMContext, session: AsyncSession, user: User
 ) -> None:
+    units = user.unit_system
     if not message.text:
-        await message.answer(ru.ERROR_WEIGHT_FORMAT)
+        await message.answer(render.weight_error("format", units))
         return
     try:
-        value = parse_weight(message.text)
+        value = parse_weight(message.text, units)
     except ValueParseError as exc:
-        await message.answer(
-            ru.ERROR_WEIGHT_FORMAT if exc.reason == "format" else ru.ERROR_WEIGHT_RANGE
-        )
+        await message.answer(render.weight_error(exc.reason, units))
         return
 
     await MeasurementService(session).record(user.id, weight_kg=value)

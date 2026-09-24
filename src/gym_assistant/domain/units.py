@@ -12,7 +12,7 @@ way out. Everything between them is metric.
 
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_CEILING, ROUND_FLOOR, ROUND_HALF_UP, Decimal
 from enum import StrEnum
 
 LB_IN_KG = Decimal("0.45359237")
@@ -40,6 +40,10 @@ WEIGHT_STEPS = {
 
 LABELS = {Units.METRIC: "кг", Units.IMPERIAL: "lbs"}
 
+# Body weight, as the column CHECK already enforces it.
+MIN_BODY_WEIGHT_KG = Decimal("20")
+MAX_BODY_WEIGHT_KG = Decimal("400")
+
 
 def label(units: Units) -> str:
     return LABELS[units]
@@ -64,3 +68,18 @@ def from_kg(kg: Decimal, units: Units) -> Decimal:
 def step(units: Units) -> Decimal:
     """The smallest increment worth showing in this system."""
     return LB_STEP if units is Units.IMPERIAL else Decimal("0.5")
+
+
+def weight_bounds(units: Units) -> tuple[Decimal, Decimal]:
+    """The allowed body weight, expressed in the user's system.
+
+    Rounded INWARD, and that is the whole point of the function. 20 kg is
+    44.09 lb, so a bound of "44" would be accepted by the parser, converted
+    back to 19.96 kg and then rejected by the CHECK constraint on the column
+    - an error message quoting a limit that does not work.
+    """
+    if units is Units.METRIC:
+        return MIN_BODY_WEIGHT_KG, MAX_BODY_WEIGHT_KG
+    low = (MIN_BODY_WEIGHT_KG / LB_IN_KG / LB_STEP).to_integral_value(ROUND_CEILING) * LB_STEP
+    high = (MAX_BODY_WEIGHT_KG / LB_IN_KG / LB_STEP).to_integral_value(ROUND_FLOOR) * LB_STEP
+    return low, high

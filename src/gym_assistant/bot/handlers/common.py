@@ -34,7 +34,10 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession, 
         return
 
     await message.answer(
-        ru.START_RETURNING.format(name=name, summary=render.render_profile_summary_short(summary))
+        ru.START_RETURNING.format(
+            name=name,
+            summary=render.render_profile_summary_short(summary, user.unit_system),
+        )
     )
 
 
