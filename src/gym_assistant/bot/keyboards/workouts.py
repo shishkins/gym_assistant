@@ -14,16 +14,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from gym_assistant.bot.texts import ru
 from gym_assistant.domain.models import Exercise
-
-# Plate maths, not round numbers: 2.5 kg is the smallest pair of plates in
-# most gyms, 5 kg the next step up.
-WEIGHT_STEPS = (Decimal("-5"), Decimal("-2.5"), Decimal("2.5"), Decimal("5"))
+from gym_assistant.domain.units import WEIGHT_STEPS, Units
 
 
 class WorkoutCB(CallbackData, prefix="wo"):
     """Session-level action."""
 
-    action: str  # start | panel | finish | undo | find | help | catalogue | technique
+    action: str  # start | panel | finish | undo | find | help | catalogue | technique | lbs
 
 
 class WorkoutExerciseCB(CallbackData, prefix="woe"):
@@ -145,19 +142,35 @@ def set_entry_keyboard(
     reps: int,
     can_repeat: bool,
     is_favourite: bool = False,
+    lbs_input: bool = False,
 ) -> InlineKeyboardMarkup:
-    """Prefilled set with nudges. Committing it is one tap from here."""
+    """Prefilled set with nudges. Committing it is one tap from here.
+
+    While ``lbs_input`` is on the nudges are pound plates and ``delta`` carries
+    pounds, because the label on the button and the number behind it have to be
+    the same thing. The panel above still reads kilograms.
+    """
     builder = InlineKeyboardBuilder()
+    units = Units.IMPERIAL if lbs_input else Units.METRIC
 
     if weight is not None:
+        suffix = " lbs" if lbs_input else ""
         builder.row(
             *[
                 InlineKeyboardButton(
-                    text=f"{step:+g}",
+                    text=f"{step:+g}{suffix}",
                     callback_data=SetAdjustCB(field="weight", delta=str(step)).pack(),
                 )
-                for step in WEIGHT_STEPS
+                for step in WEIGHT_STEPS[units]
             ]
+        )
+        # Directly under the nudges it governs, and above the rest: this is the
+        # one button on the panel that changes what a typed number means.
+        builder.row(
+            InlineKeyboardButton(
+                text=ru.BTN_WORKOUT_LBS_ON if lbs_input else ru.BTN_WORKOUT_LBS,
+                callback_data=WorkoutCB(action="lbs").pack(),
+            )
         )
 
     builder.row(

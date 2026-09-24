@@ -19,6 +19,10 @@ Accepted, roughly in order of how often they appear:
     80х8 @8         RPE
     р 80х8          разминочный (в начале)
     80х8 разминка   разминочный (в конце)
+    lbs 225х5       вес в фунтах — метка с краю строки
+    225х5 lbs       она же с другого края
+    225lbs х 5      она же вплотную к числу
+    кг 100х5        та же метка наоборот, когда включён режим фунтов
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from gym_assistant.domain.parsing.values import ValueParseError
+from gym_assistant.domain.units import Units, to_kg
 
 MAX_REPEAT = 20
 
@@ -42,12 +47,38 @@ _RPE = re.compile(r"(?:@|\brpe\s*|\bрпе\s*)(\d+(?:[.,]\d)?)", re.IGNORECASE)
 _CLOCK = re.compile(r"^(\d{1,2}):([0-5]\d)$")
 _NUMBER = re.compile(r"^[+-]?\d+(?:\.\d+)?$")
 
+# The weight marker, in the two shapes it actually gets typed: a word of its
+# own at either end of the line, or stuck to the number. Both are accepted
+# because both were asked for, and because a marker you have to place exactly
+# right is a marker you stop using by the third set.
+#
+# "ф" alone is deliberately not a marker: it is one letter away from too many
+# things, and the warmup marker already spends the single-letter budget.
+_POUND_WORD = r"lbs|lbf|lb|фунтов|фунта|фунты|фунт"
+_KILO_WORD = r"кг|kg"
+_NUMBER_PART = r"[+-]?\d+(?:\.\d+)?"
+
+_EITHER_WORD = "(?P<lb>" + _POUND_WORD + ")|(?P<kg>" + _KILO_WORD + ")"
+
+_MARKER_TOKEN = re.compile("^(?:" + _EITHER_WORD + ")$", re.IGNORECASE)
+_MARKER_SUFFIX = re.compile(
+    "^(?P<number>" + _NUMBER_PART + r")\s*(?:" + _EITHER_WORD + ")$",
+    re.IGNORECASE,
+)
+
 _UNIT_PATTERNS = (
     # Minutes before metres: "5мин" must not read as 5 metres.
     ("minutes", re.compile(r"^(\d+(?:\.\d+)?)\s*(?:мин|min|м\.)$", re.IGNORECASE)),
     ("seconds", re.compile(r"^(\d+(?:\.\d+)?)\s*(?:сек|с|sec|s)$", re.IGNORECASE)),
     ("metres", re.compile(r"^(\d+(?:\.\d+)?)\s*(?:метров|метра|метр|м|m)$", re.IGNORECASE)),
-    ("kg", re.compile(r"^(\d+(?:\.\d+)?)\s*(?:кг|kg)$", re.IGNORECASE)),
+    # A bare weight is not a set whichever unit it carries.
+    (
+        "weight",
+        re.compile(
+            "^(" + _NUMBER_PART + r")\s*(?:" + _POUND_WORD + "|" + _KILO_WORD + ")$",
+            re.IGNORECASE,
+        ),
+    ),
 )
 
 
@@ -63,20 +94,31 @@ class ParsedSet:
     is_warmup: bool = False
     repeat: int = 1
     exercise_query: str | None = None
+    # Whether the line said its own unit, as opposed to inheriting the panel's
+    # mode. The caller needs to tell the two apart: a mode belongs to one
+    # exercise, a marker belongs to the line it was typed on.
+    marked_units: Units | None = None
 
     @property
     def has_payload(self) -> bool:
         return any((self.reps, self.duration_sec, self.distance_m))
 
 
-def parse_set_entry(raw: str) -> ParsedSet:
-    """Reads one line into a set, or raises :class:`ValueParseError`."""
+def parse_set_entry(raw: str, default_units: Units = Units.METRIC) -> ParsedSet:
+    """Reads one line into a set, or raises :class:`ValueParseError`.
+
+    ``weight_kg`` comes back in kilograms whatever was typed. ``default_units``
+    is what a bare number means - the panel's input mode - and a marker in the
+    line always wins over it, in either direction. That is what makes the mode
+    safe to leave on: the one machine labelled in kilos is "100кг х 5" and
+    nothing has to be switched back.
+    """
     text = " ".join(raw.strip().lower().replace(",", ".").split())
     if not text:
         raise ValueParseError("format")
 
     text, rpe = _take_rpe(text)
-    text, is_warmup = _take_warmup(text)
+    text, marked, is_warmup = _take_qualifiers(text)
     exercise_query, text = _split_exercise(text)
 
     if not text:
@@ -87,8 +129,18 @@ def parse_set_entry(raw: str) -> ParsedSet:
         raise ValueParseError("format")
 
     parsed = _parse_numbers(text)
+    marked = _agree(marked, parsed.units)
+    if marked is not None and parsed.weight is None:
+        # A unit marker is a statement about a weight, so a line carrying one
+        # and no weight is malformed. Without this "225 lbs" parsed as 225
+        # REPETITIONS: the marker was stripped, one number was left, and one
+        # number means reps. A plausible-looking set that never happened.
+        raise ValueParseError("format")
+
+    units = marked or default_units
     return ParsedSet(
-        weight_kg=parsed.weight_kg,
+        marked_units=marked,
+        weight_kg=None if parsed.weight is None else to_kg(parsed.weight, units),
         reps=parsed.reps,
         duration_sec=parsed.duration_sec,
         distance_m=parsed.distance_m,
@@ -100,6 +152,63 @@ def parse_set_entry(raw: str) -> ParsedSet:
 
 
 # --- pieces ---------------------------------------------------------------
+
+
+def _agree(first: Units | None, second: Units | None) -> Units | None:
+    """Two markers on one line have to say the same thing.
+
+    "225lbs х 5 кг" is not a set with a preference, it is a typo, and guessing
+    which half was meant writes a wrong number into the history.
+    """
+    if first is not None and second is not None and first is not second:
+        raise ValueParseError("format")
+    return first or second
+
+
+def _marker_units(match: re.Match[str]) -> Units:
+    return Units.IMPERIAL if match.group("lb") else Units.METRIC
+
+
+def _take_marker(text: str) -> tuple[str, Units | None]:
+    """Strips a standalone unit word off either end of the line.
+
+    Either end, for the same reason the warmup marker works at either end: the
+    numbers come to mind first, so the qualifier lands wherever the thumb was.
+    Only the first and last token are considered - the middle of the line is
+    the exercise name, and an exercise is not going to be called "lbs".
+    """
+    tokens = text.split()
+    if not tokens:
+        return text, None
+
+    units: Units | None = None
+    if (match := _MARKER_TOKEN.match(tokens[-1])) is not None and len(tokens) > 1:
+        units = _marker_units(match)
+        tokens = tokens[:-1]
+    if tokens and (match := _MARKER_TOKEN.match(tokens[0])) is not None and len(tokens) > 1:
+        units = _agree(units, _marker_units(match))
+        tokens = tokens[1:]
+
+    return " ".join(tokens).strip(), units
+
+
+def _take_qualifiers(text: str) -> tuple[str, Units | None, bool]:
+    """Peels the unit marker and the warmup marker off, in any order.
+
+    Both live at the ends of the line and either can be outside the other:
+    "225х5 lbs разминка" and "lbs р 135х5" are both things people type. One
+    pass in a fixed order always leaves the inner one stuck to the numbers, so
+    this keeps going until a pass takes nothing.
+    """
+    units: Units | None = None
+    is_warmup = False
+    while True:
+        text, found = _take_marker(text)
+        text, warmup = _take_warmup(text)
+        units = _agree(units, found)
+        is_warmup = is_warmup or warmup
+        if found is None and not warmup:
+            return text, units, is_warmup
 
 
 def _take_rpe(text: str) -> tuple[str, Decimal | None]:
@@ -149,11 +258,14 @@ def _split_exercise(text: str) -> tuple[str | None, str]:
 
 @dataclass(frozen=True, slots=True)
 class _Numbers:
-    weight_kg: Decimal | None = None
+    """What the digits said. ``weight`` is still in whatever was typed."""
+
+    weight: Decimal | None = None
     reps: int | None = None
     duration_sec: int | None = None
     distance_m: int | None = None
     repeat: int = 1
+    units: Units | None = None
 
 
 def _parse_numbers(text: str) -> _Numbers:
@@ -176,19 +288,44 @@ def _parse_numbers(text: str) -> _Numbers:
     if not parts:
         raise ValueParseError("format")
 
+    parts, units = _take_attached_markers(parts)
     values = [_number(part) for part in parts]
 
     if len(values) == 1:
-        return _Numbers(reps=_as_reps(values[0]))
+        return _Numbers(reps=_as_reps(values[0]), units=units)
     if len(values) == 2:
-        return _Numbers(weight_kg=_as_weight(values[0]), reps=_as_reps(values[1]))
+        return _Numbers(weight=_as_weight(values[0]), reps=_as_reps(values[1]), units=units)
     if len(values) == 3:
         return _Numbers(
-            weight_kg=_as_weight(values[0]),
+            weight=_as_weight(values[0]),
             reps=_as_reps(values[1]),
             repeat=_as_repeat(values[2]),
+            units=units,
         )
     raise ValueParseError("format")
+
+
+def _take_attached_markers(parts: list[str]) -> tuple[list[str], Units | None]:
+    """Peels "lbs" off "225lbs", leaving a number the rest of the code can read.
+
+    Run after the whole-line unit check, not before: "80кг" on its own has to
+    stay a format error rather than quietly becoming eighty repetitions.
+    """
+    cleaned: list[str] = []
+    units: Units | None = None
+    for part in parts:
+        stripped = part.strip()
+        if (standalone := _MARKER_TOKEN.match(stripped)) is not None:
+            # "225 фунтов х 5": a space before the unit is not a decision.
+            units = _agree(units, _marker_units(standalone))
+            continue
+        match = _MARKER_SUFFIX.match(stripped)
+        if match is None:
+            cleaned.append(part)
+            continue
+        units = _agree(units, _marker_units(match))
+        cleaned.append(match.group("number"))
+    return cleaned, units
 
 
 def _with_unit(part: str) -> _Numbers | None:
@@ -203,7 +340,7 @@ def _with_unit(part: str) -> _Numbers | None:
             return _Numbers(duration_sec=_as_duration(value))
         if kind == "metres":
             return _Numbers(distance_m=_as_distance(value))
-        # A bare weight with no reps is not a set on its own.
+        # A bare weight with no reps is not a set on its own, in either unit.
         raise ValueParseError("format")
     return None
 

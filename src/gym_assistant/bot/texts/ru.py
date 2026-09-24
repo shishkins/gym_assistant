@@ -348,6 +348,14 @@ WORKOUT_SET_LINE_WARMUP = "  {index}. {value} · разминка"
 WORKOUT_ENTRY = "\n\nЗаписать: <b>{weight}</b> × <b>{reps}</b>"
 WORKOUT_ENTRY_BODYWEIGHT = "\n\nЗаписать: <b>{reps}</b> повторов"
 
+# Kilograms stay on screen while pounds are being typed, so the panel has to
+# say which one a bare number means - otherwise 225 is ambiguous exactly
+# where it matters.
+WORKOUT_LBS_HINT = (
+    "\n<i>Ввод в фунтах: пишете <b>225</b> — записываю <b>102.06 кг</b>."
+    " Нужен вес в килограммах — напишите <code>кг 100х5</code>.</i>"
+)
+
 WORKOUT_SET_SAVED = "✅ {value}"
 WORKOUT_SETS_SAVED = "✅ {count} подхода: {value}"
 # The record is the weight on the bar, so the message shows the set.
@@ -357,6 +365,12 @@ WORKOUT_RECORD_ESTIMATE = "\n<i>Расчётный максимум: ~{estimate}
 
 WORKOUT_SET_UNDONE = "↩️ Убрал: {value}"
 WORKOUT_NOTHING_TO_UNDO = "Отменять нечего — подходов ещё нет."
+
+# Said on the toast, so it has to fit one line and name the scope: the mode
+# dies with the exercise, and a user who expects it to last the session
+# would otherwise find out by writing a wrong number.
+WORKOUT_LBS_ENABLED = "Ввод в фунтах — на это упражнение"
+WORKOUT_LBS_DISABLED = "Ввод в килограммах"
 
 WORKOUT_NEED_EXERCISE = (
     "Не понял, к какому упражнению это относится.\n\n"
@@ -429,6 +443,11 @@ WORKOUT_INPUT_HELP = (
 BTN_WORKOUT_HELP = "❔ Как записывать"
 BTN_WORKOUT_CATALOGUE = "📖 Справочник"
 BTN_WORKOUT_TECHNIQUE = "📖 Техника"
+# Names the state it will put you in, not the state you are in: a toggle
+# labelled with the present tense reads as a statement and gets tapped by
+# mistake. The tick marks the mode that is running.
+BTN_WORKOUT_LBS = "⚖️ Ввод в lbs"
+BTN_WORKOUT_LBS_ON = "✅ Ввод в lbs"
 BTN_WORKOUT_FAV = "⭐ В избранное"
 BTN_WORKOUT_UNFAV = "⭐ В избранном"
 BTN_WORKOUT_BACK_TO_SET = "⬅️ К подходу"

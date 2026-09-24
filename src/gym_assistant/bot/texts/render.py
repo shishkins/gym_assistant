@@ -236,6 +236,7 @@ def render_exercise_panel(
     *,
     weight: Decimal | None,
     reps: int,
+    lbs_input: bool = False,
 ) -> str:
     if history.is_first_time:
         text = ru.WORKOUT_EXERCISE_FIRST_TIME.format(name=history.exercise.name_ru)
@@ -255,6 +256,8 @@ def render_exercise_panel(
         text += ru.WORKOUT_ENTRY.format(weight=format_weight(weight), reps=reps)
     else:
         text += ru.WORKOUT_ENTRY_BODYWEIGHT.format(reps=reps)
+    if lbs_input:
+        text += ru.WORKOUT_LBS_HINT
     return text
 
 

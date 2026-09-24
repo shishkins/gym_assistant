@@ -39,6 +39,7 @@ from gym_assistant.domain.services import (
     NoOpenWorkoutError,
     WorkoutService,
 )
+from gym_assistant.domain.units import Units, from_kg, to_kg
 
 log = structlog.get_logger(__name__)
 router = Router(name="workouts")
@@ -78,7 +79,8 @@ async def _exercise_panel(
     ]
 
     data = await state.get_data()
-    if data.get("exercise_id") == exercise.id and "reps" in data:
+    same_exercise = data.get("exercise_id") == exercise.id
+    if same_exercise and "reps" in data:
         weight = Decimal(data["weight"]) if data.get("weight") is not None else None
         reps = int(data["reps"])
     else:
@@ -87,20 +89,29 @@ async def _exercise_panel(
         weight = history.suggested_weight
         reps = history.suggested_reps or DEFAULT_REPS
 
+    # The pounds mode belongs to the exercise being done, and this is the one
+    # place that knows whether we are still on it. Carrying it further would
+    # mean the next exercise silently reads a bare number as pounds.
+    lbs_input = same_exercise and bool(data.get("lbs_input"))
+
     await state.set_state(WorkoutFlow.active)
     await state.update_data(
         exercise_id=exercise.id,
         weight=str(weight) if weight is not None else None,
         reps=reps,
+        lbs_input=lbs_input,
     )
 
-    text = render.render_exercise_panel(history, today, weight=weight, reps=reps)
+    text = render.render_exercise_panel(
+        history, today, weight=weight, reps=reps, lbs_input=lbs_input
+    )
     is_favourite = await ExerciseService(service.session).is_favourite(user.id, exercise.id)
     return text, set_entry_keyboard(
         weight=weight,
         reps=reps,
         can_repeat=bool(today),
         is_favourite=is_favourite,
+        lbs_input=lbs_input,
     )
 
 
@@ -173,7 +184,7 @@ async def workout_action(
         case "panel":
             await state.set_state(WorkoutFlow.active)
             # Forget the pending set: the panel is a fresh choice of exercise.
-            await state.update_data(exercise_id=None, weight=None, reps=None)
+            await state.update_data(exercise_id=None, weight=None, reps=None, lbs_input=False)
             text, markup = await _panel(service, user)
             await _edit(callback, text, markup)
 
@@ -195,6 +206,9 @@ async def workout_action(
 
         case "technique":
             await _technique(callback, session, state, user)
+
+        case "lbs":
+            await _toggle_lbs(callback, session, state, user)
 
         case "catalogue":
             # The session stays open; the catalogue offers a way back.
@@ -235,6 +249,32 @@ async def _technique(
             is_favourite=await service.is_favourite(user.id, exercise.id),
         ),
     )
+
+
+async def _toggle_lbs(
+    callback: CallbackQuery, session: AsyncSession, state: FSMContext, user: User
+) -> None:
+    """Switches what a typed number means, for this exercise only.
+
+    Asked for after a session in a gym stacked in pounds: the diary stays in
+    kilograms, but reading a plate and converting it in your head between reps
+    is how wrong numbers get written down.
+    """
+    data = await state.get_data()
+    exercise_id = data.get("exercise_id")
+    if exercise_id is None:
+        await callback.answer(ru.WORKOUT_TECHNIQUE_NO_EXERCISE, show_alert=True)
+        return
+
+    enabled = not data.get("lbs_input")
+    await state.update_data(lbs_input=enabled)
+    await callback.answer(ru.WORKOUT_LBS_ENABLED if enabled else ru.WORKOUT_LBS_DISABLED)
+
+    exercise = await ExerciseService(session).get(int(exercise_id), user_id=user.id)
+    if exercise is None:
+        return
+    text, markup = await _exercise_panel(WorkoutService(session), user, exercise, state)
+    await _edit(callback, text, markup)
 
 
 @router.callback_query(WorkoutFavCB.filter())
@@ -312,7 +352,7 @@ async def pick_exercise(
     if exercise is None:
         return
     # Choosing an exercise resets the pending values to that exercise's own.
-    await state.update_data(exercise_id=None, weight=None, reps=None)
+    await state.update_data(exercise_id=None, weight=None, reps=None, lbs_input=False)
     text, markup = await _exercise_panel(WorkoutService(session), user, exercise, state)
     await _edit(callback, text, markup)
 
@@ -395,9 +435,13 @@ async def adjust_set(
         return
 
     if callback_data.field == "weight":
+        # Out of storage, add, back into storage. Adding a converted step to
+        # kilograms instead would drift: +5 lbs is 2.2679685 kg, stored as
+        # 2.27, and twenty taps of that is a weight nobody typed.
+        units = _input_units(data)
         current = Decimal(data["weight"]) if data.get("weight") is not None else Decimal(0)
-        updated = max(Decimal(0), current + Decimal(callback_data.delta))
-        await state.update_data(weight=str(updated))
+        shown = max(Decimal(0), from_kg(current, units) + Decimal(callback_data.delta))
+        await state.update_data(weight=str(to_kg(shown, units)))
     else:
         reps = max(1, int(data.get("reps") or DEFAULT_REPS) + int(callback_data.delta))
         await state.update_data(reps=reps)
@@ -449,8 +493,9 @@ async def commit_set(
 async def typed_set(message: Message, state: FSMContext, session: AsyncSession, user: User) -> None:
     """Free text during a session is a set - the fastest path there is."""
     assert message.text is not None
+    data = await state.get_data()
     try:
-        parsed = parse_set_entry(message.text)
+        parsed = parse_set_entry(message.text, _input_units(data))
     except ValueParseError as exc:
         await message.answer(
             ru.WORKOUT_SET_FORMAT_ERROR if exc.reason == "format" else ru.WORKOUT_SET_RANGE_ERROR
@@ -459,7 +504,6 @@ async def typed_set(message: Message, state: FSMContext, session: AsyncSession, 
 
     exercises = ExerciseService(session)
     workouts = WorkoutService(session)
-    data = await state.get_data()
 
     exercise: Exercise | None = None
     if parsed.exercise_query:
@@ -475,9 +519,20 @@ async def typed_set(message: Message, state: FSMContext, session: AsyncSession, 
         await message.answer(ru.WORKOUT_NEED_EXERCISE)
         return
 
+    # The mode belongs to the exercise it was switched on for, and a line
+    # naming a different one has already left it. The unit can only be checked
+    # once the name is parsed, so this re-reads rather than guesses - unless
+    # the line stated its own unit, which outranks any mode.
+    if (
+        parsed.marked_units is None
+        and data.get("exercise_id") != exercise.id
+        and _input_units(data) is Units.IMPERIAL
+    ):
+        parsed = parse_set_entry(message.text, Units.METRIC)
+
     if not parsed.has_payload:
         # Just a name: switch to that exercise rather than refusing.
-        await state.update_data(exercise_id=None, weight=None, reps=None)
+        await state.update_data(exercise_id=None, weight=None, reps=None, lbs_input=False)
         text, markup = await _exercise_panel(workouts, user, exercise, state)
         await message.answer(text, reply_markup=markup)
         return
@@ -518,14 +573,24 @@ async def _store(
             )
         await message.answer(text)
 
-    # Keep the pending values so the next identical set is one tap away.
+    # Keep the pending values so the next identical set is one tap away. The
+    # pounds mode is dropped when the line named a different exercise: writing
+    # exercise_id here would otherwise make _exercise_panel believe we never
+    # left, and the mode would follow along uninvited.
+    stayed = (await state.get_data()).get("exercise_id") == exercise.id
     await state.update_data(
         exercise_id=exercise.id,
         weight=str(parsed.weight_kg) if parsed.weight_kg is not None else None,
         reps=parsed.reps or DEFAULT_REPS,
+        lbs_input=stayed and bool((await state.get_data()).get("lbs_input")),
     )
     text, markup = await _exercise_panel(service, user, exercise, state)
     await message.answer(text, reply_markup=markup)
+
+
+def _input_units(data: dict[str, object]) -> Units:
+    """What a bare number in this panel means right now."""
+    return Units.IMPERIAL if data.get("lbs_input") else Units.METRIC
 
 
 def _confirmation(stored: list[WorkoutSet]) -> str:
