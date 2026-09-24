@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
+from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.ai.client import (
@@ -23,6 +24,7 @@ from gym_assistant.ai.client import (
 from gym_assistant.ai.conversation import ConversationService
 from gym_assistant.ai.usage import Tokens, UsageService
 from gym_assistant.bot.handlers import ai as ai_handlers
+from gym_assistant.bot.handlers.ai import SEND_ATTEMPTS
 from gym_assistant.config import Settings
 from gym_assistant.domain.models import Role
 from gym_assistant.domain.services import AccessService, ProfileService
@@ -318,3 +320,135 @@ async def test_an_admin_sees_the_whole_bill(admin_bot: BotHarness, session: Asyn
     assert "friend" in reply
     assert "5.00" in reply
     assert "claude-opus-5" in reply
+
+
+# --- delivery -------------------------------------------------------------
+
+
+def _fail_sends(bot: BotHarness, times: int, fragment: str) -> dict[str, int]:
+    """Makes the next ``times`` sends of the answer fail like a stalled line."""
+    counter = {"attempts": 0}
+    original = bot.session.make_request
+
+    async def flaky(bot_: Any, method: Any, timeout: Any = None) -> Any:  # noqa: ASYNC109
+        if type(method).__name__ == "SendMessage" and fragment in (
+            getattr(method, "text", "") or ""
+        ):
+            counter["attempts"] += 1
+            if counter["attempts"] <= times:
+                raise TelegramNetworkError(method=method, message="Request timeout error")
+        return await original(bot_, method, timeout)
+
+    bot.session.make_request = flaky  # type: ignore[method-assign]
+    return counter
+
+
+async def test_a_stalled_send_is_retried(
+    bot: BotHarness, session: AsyncSession, stub: StubAssistant
+) -> None:
+    """One bad connection used to swallow an answer that was already paid for."""
+    await _subscribe(session)
+    counter = _fail_sends(bot, times=1, fragment="Жим вырос")
+
+    await bot.send("/ask как растёт жим")
+
+    assert counter["attempts"] == 2, "отправка не повторилась"
+    assert "Жим вырос" in bot.session.last_text
+
+
+async def test_the_exchange_survives_a_delivery_that_never_lands(
+    bot: BotHarness, session: AsyncSession, stub: StubAssistant
+) -> None:
+    """The answer is paid for before it is sent, so losing the record of it
+    because Telegram would not take the message is the worst of both: charged
+    for, and then absent from the conversation it belonged to.
+
+    The spend row is written inside the assistant, one step earlier in the
+    same transaction, so this commit covers it too.
+    """
+    await _subscribe(session)
+    _fail_sends(bot, times=SEND_ATTEMPTS, fragment="Жим вырос")
+
+    await bot.send("/ask как растёт жим")
+
+    await _assert_exchange_stored(session)
+
+
+async def test_the_exchange_is_committed_before_it_is_sent(
+    bot: BotHarness, session: AsyncSession, stub: StubAssistant
+) -> None:
+    """The ordering IS the guarantee, so the ordering is what gets pinned.
+
+    This is the shape the real loss had: the send raised, the session was
+    committed only after the handler returned, so the middleware rolled back
+    an answer that had already been charged for. Delivery failures are caught
+    now, but the commit has to hold for the ones nobody predicted - and a test
+    that stores through the harness cannot show it, because the harness hands
+    every handler the same session and never rolls it back.
+    """
+    await _subscribe(session)
+
+    order: list[str] = []
+    committed = session.commit
+    sent = bot.session.make_request
+
+    async def spy_commit() -> None:
+        order.append("commit")
+        await committed()
+
+    async def spy_send(bot_: Any, method: Any, timeout: Any = None) -> Any:  # noqa: ASYNC109
+        if type(method).__name__ == "SendMessage" and "Жим вырос" in (
+            getattr(method, "text", "") or ""
+        ):
+            order.append("send")
+        return await sent(bot_, method, timeout)
+
+    session.commit = spy_commit  # type: ignore[method-assign]
+    bot.session.make_request = spy_send  # type: ignore[method-assign]
+
+    await bot.send("/ask как растёт жим")
+
+    assert "send" in order, "ответ не отправлялся"
+    assert order.index("commit") < order.index("send"), (
+        "переписка фиксируется после отправки — падение на отправке её потеряет"
+    )
+
+
+async def test_bad_html_from_the_model_falls_back_to_plain_text(
+    bot: BotHarness, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The prompt lets the model write <b> by hand, so an unclosed tag is a
+    400 from Telegram - and used to cost the whole answer."""
+    await _subscribe(session)
+    monkeypatch.setattr(
+        ai_handlers, "build_assistant", lambda *_: StubAssistant(text="Жим вырос <b>до 80")
+    )
+    original = bot.session.make_request
+    seen: list[str | None] = []
+
+    async def picky(bot_: Any, method: Any, timeout: Any = None) -> Any:  # noqa: ASYNC109
+        if type(method).__name__ == "SendMessage" and "Жим вырос" in (
+            getattr(method, "text", "") or ""
+        ):
+            mode = getattr(method, "parse_mode", "unset")
+            seen.append(mode)
+            if mode != "unset" and mode is None:
+                return await original(bot_, method, timeout)
+            raise TelegramBadRequest(method=method, message="can't parse entities")
+        return await original(bot_, method, timeout)
+
+    bot.session.make_request = picky  # type: ignore[method-assign]
+
+    await bot.send("/ask как растёт жим")
+
+    assert len(seen) == 2, "ответ не переотправлен без разметки"
+    assert "Жим вырос" in bot.session.last_text
+
+
+async def _assert_exchange_stored(session: AsyncSession) -> None:
+    user = await ProfileService(session).get_or_create_user(TELEGRAM_ID)
+    conversation = ConversationService(session)
+    talk = await conversation.active(user.id)
+    history = await conversation.history(talk.id)
+
+    assert any("Жим вырос" in str(turn) for turn in history), "ответ не попал в переписку"

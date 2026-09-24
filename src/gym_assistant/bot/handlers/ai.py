@@ -8,8 +8,12 @@ forgotten on one of them.
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
+
 import structlog
 from aiogram import Router
+from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +33,14 @@ from gym_assistant.config import Settings
 from gym_assistant.domain.models import Role, User
 
 log = structlog.get_logger(__name__)
+
+# aiogram waits 60 seconds for Telegram and does not retry. That is the wrong
+# shape for this one message: it is the only thing in the bot that has already
+# cost money by the time it is sent, so three bounded attempts are cheaper than
+# one silent loss. Seen for real - a stalled connection swallowed an answer
+# that had been paid for.
+SEND_ATTEMPTS = 3
+SEND_TIMEOUT_SEC = 20
 
 
 def build_assistant(settings: Settings, usage: UsageService) -> AiAssistant:
@@ -140,4 +152,41 @@ async def _answer(
         cache_read=answer.tokens.cache_read,
     )
 
-    await message.answer(answer.text or ru.AI_EMPTY_ANSWER)
+    # The money has already left; the record of it must not depend on Telegram
+    # accepting a message. Until this commit the session was committed only
+    # after the handler returned, so a failed send rolled the whole update
+    # back: the answer was paid for and then forgotten - absent from the
+    # conversation it belonged to and absent from /ai_usage.
+    await session.commit()
+
+    await _deliver(message, answer.text or ru.AI_EMPTY_ANSWER)
+
+
+async def _deliver(message: Message, text: str) -> None:
+    """Sends the answer, retrying a stalled line and falling back on bad HTML.
+
+    Deliberately does not re-raise. By the time this runs the exchange is
+    committed, so there is nothing left to undo, and a named line says more
+    about what happened than a generic handler traceback.
+    """
+    for attempt in range(1, SEND_ATTEMPTS + 1):
+        try:
+            await asyncio.wait_for(message.answer(text), timeout=SEND_TIMEOUT_SEC)
+            return
+        except TelegramBadRequest as exc:
+            # The bot speaks HTML and the prompt lets the model use <b>, so the
+            # model writes the markup by hand - and an unclosed tag, or a bare
+            # "<" in front of a number, is a 400 rather than a retryable
+            # failure. Plain text shows the tags but keeps the answer.
+            log.warning("ai_delivery_plain", reason=str(exc))
+            with suppress(TelegramNetworkError, TelegramBadRequest, TimeoutError):
+                await asyncio.wait_for(
+                    message.answer(text, parse_mode=None), timeout=SEND_TIMEOUT_SEC
+                )
+            return
+        except (TelegramNetworkError, TimeoutError) as exc:
+            if attempt < SEND_ATTEMPTS:
+                log.warning("ai_delivery_retry", attempt=attempt, reason=str(exc))
+                await asyncio.sleep(1)
+                continue
+            log.error("ai_delivery_failed", attempts=attempt, chars=len(text), reason=str(exc))
