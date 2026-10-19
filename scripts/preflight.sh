@@ -11,6 +11,10 @@
 # Written after a provider handed us a VM with a generic QEMU CPU - no
 # SSE4.2, no POPCNT - on which NumPy refuses to import at all, and therefore
 # the bot could not start. Everything else had already been set up by then.
+#
+# The thresholds below are what this bot needs, not what sounds generous. Both
+# were wrong once: memory asked for a cancelled feature's hardware, and disk
+# passed a size we had already watched fill up.
 set -uo pipefail
 
 fail=0
@@ -36,12 +40,10 @@ for flag in popcnt ssse3 sse4_1 sse4_2; do
     fi
 done
 
-# Not needed today; needed by faster-whisper in iteration 6.
-if grep -qm1 ' avx2' /proc/cpuinfo; then
-    ok "avx2 — голосовой ввод потянет"
-else
-    soft "avx2 — нет. Локальное распознавание речи будет очень медленным или не заведётся"
-fi
+# avx2 used to be checked here for faster-whisper. Iteration 6 - voice input -
+# was cancelled on 23.09.2026, so nothing in this bot needs it, and a warning
+# about a feature that does not exist is noise in a gate meant to be read in a
+# hurry while deciding whether to return a server.
 
 echo
 echo "=== Ресурсы ==="
@@ -49,8 +51,20 @@ mem_mb=$(($(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024))
 disk_gb=$(df -BG --output=size / | tail -1 | tr -dc '0-9')
 echo "  память: ${mem_mb} МБ"
 echo "  диск:   ${disk_gb} ГБ"
-[ "$mem_mb" -ge 3500 ] || bad "мало памяти для итерации 6 (нужно от 4 ГБ)"
-[ "$disk_gb" -ge 20 ] || bad "мало места на диске"
+# 4 GB was the figure for iteration 6's local speech model, which was
+# cancelled. What actually runs is postgres (~200 MB), redis (~20 MB) and the
+# bot with matplotlib and numpy loaded (~400 MB), on top of the system and
+# docker (~400 MB). Two gigabytes is enough; a 2 GB VM reports a little under
+# that once the kernel has taken its share.
+[ "$mem_mb" -ge 1800 ] || bad "мало памяти (нужно от 2 ГБ)"
+
+# Raised from 20 after a 25 GB disk filled completely in three weeks and the
+# deploy failed in a way that looked like anything but "no space": the
+# migration reported success and the bot quietly stayed on its old image.
+# The database is not what fills it - that was 67 MB. Docker images are:
+# 1.3 GB each, one per deploy. A threshold that passes the exact machine we
+# already know fails is worse than no threshold, because it is trusted.
+[ "$disk_gb" -ge 40 ] || bad "мало места на диске (нужно от 40 ГБ: образы Docker по 1.3 ГБ)"
 echo "  Сверьте с тем, за что заплачено."
 
 echo
