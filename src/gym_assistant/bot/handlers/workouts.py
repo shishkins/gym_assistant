@@ -368,7 +368,9 @@ async def search_exercise(
     service = ExerciseService(session)
     total = await service.count_search(message.text, user_id=user.id)
     if total == 0:
-        await message.answer(ru.WORKOUT_EXERCISE_NOT_FOUND.format(query=message.text))
+        await message.answer(
+            ru.WORKOUT_EXERCISE_NOT_FOUND.format(query=render.escape(message.text or ""))
+        )
         return
 
     # Remembered so the pager has something to page through.
@@ -509,7 +511,9 @@ async def typed_set(message: Message, state: FSMContext, session: AsyncSession, 
     if parsed.exercise_query:
         found = await exercises.search(parsed.exercise_query, user_id=user.id, limit=1)
         if not found:
-            await message.answer(ru.WORKOUT_EXERCISE_NOT_FOUND.format(query=parsed.exercise_query))
+            await message.answer(
+                ru.WORKOUT_EXERCISE_NOT_FOUND.format(query=render.escape(parsed.exercise_query))
+            )
             return
         exercise = found[0]
     elif data.get("exercise_id"):

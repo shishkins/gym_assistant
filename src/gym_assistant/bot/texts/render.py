@@ -26,6 +26,16 @@ from gym_assistant.domain.services import (
 )
 
 
+def escape(text: str) -> str:
+    """Text a person or a model wrote, made safe for an HTML message.
+
+    The bot speaks HTML, so a "<" in an exercise name or a search query is a
+    tag to Telegram, and a broken tag makes it refuse the whole message.
+    Everything that did not come from this codebase goes through here.
+    """
+    return html.escape(text, quote=False)
+
+
 def format_decimal(value: Decimal) -> str:
     """``Decimal('82.50')`` -> ``82.5``; ``Decimal('80.00')`` -> ``80``.
 
@@ -169,12 +179,12 @@ def render_exercise_card(exercise: Exercise) -> str:
         type=ru.EXERCISE_TYPE_LABELS[ExerciseType(exercise.exercise_type)],
     )
     kind = ru.EXERCISE_COMPOUND if exercise.is_compound else ru.EXERCISE_ISOLATION
-    card = ru.EXERCISE_CARD.format(name=exercise.name_ru, meta=f"{meta} · {kind}")
+    card = ru.EXERCISE_CARD.format(name=escape(exercise.name_ru), meta=f"{meta} · {kind}")
 
     if exercise.technique_tips:
-        card += ru.EXERCISE_TIPS.format(tips=exercise.technique_tips.strip())
+        card += ru.EXERCISE_TIPS.format(tips=escape(exercise.technique_tips.strip()))
     if exercise.common_mistakes:
-        card += ru.EXERCISE_MISTAKES.format(mistakes=exercise.common_mistakes.strip())
+        card += ru.EXERCISE_MISTAKES.format(mistakes=escape(exercise.common_mistakes.strip()))
     if not exercise.is_system:
         card += ru.EXERCISE_OWN_BADGE
 
@@ -231,7 +241,7 @@ def render_workout_panel(
     else:
         body = "\n".join(
             ru.WORKOUT_PANEL_LINE.format(
-                name=exercise.name_ru,
+                name=escape(exercise.name_ru),
                 sets=", ".join(render_set_value(item) for item in items),
             )
             for exercise, items in by_exercise
@@ -253,10 +263,10 @@ def render_exercise_panel(
     lbs_input: bool = False,
 ) -> str:
     if history.is_first_time:
-        text = ru.WORKOUT_EXERCISE_FIRST_TIME.format(name=history.exercise.name_ru)
+        text = ru.WORKOUT_EXERCISE_FIRST_TIME.format(name=escape(history.exercise.name_ru))
     else:
         text = ru.WORKOUT_EXERCISE_HISTORY.format(
-            name=history.exercise.name_ru,
+            name=escape(history.exercise.name_ru),
             when=format_when(history.last_performed_at) if history.last_performed_at else "",
             sets=render_set_lines(history.last_sets),
         )
@@ -281,7 +291,7 @@ def render_workout_summary(summary: WorkoutSummary) -> str:
 
     body = "\n".join(
         ru.WORKOUT_PANEL_LINE.format(
-            name=exercise.name_ru,
+            name=escape(exercise.name_ru),
             sets=", ".join(render_set_value(item) for item in items),
         )
         for exercise, items in summary.by_exercise
@@ -296,7 +306,9 @@ def render_workout_summary(summary: WorkoutSummary) -> str:
     if summary.records:
         text += ru.WORKOUT_FINISHED_RECORDS.format(
             records="\n".join(
-                ru.WORKOUT_RECORD_LINE.format(name=exercise.name_ru, best=format_weight(best))
+                ru.WORKOUT_RECORD_LINE.format(
+                    name=escape(exercise.name_ru), best=format_weight(best)
+                )
                 for exercise, best in summary.records
             )
         )
@@ -364,11 +376,11 @@ def render_body_estimate(
     if estimate.observations:
         parts.append(
             ru.BODY_SEEN.format(
-                observations=html.escape("; ".join(str(line) for line in estimate.observations))
+                observations=escape("; ".join(str(line) for line in estimate.observations))
             )
         )
     if estimate.limits:
-        parts.append(ru.BODY_LIMITS.format(limits=html.escape(estimate.limits)))
+        parts.append(ru.BODY_LIMITS.format(limits=escape(estimate.limits)))
 
     if previous is not None:
         before = body.Band(previous.bf_low, previous.bf_likely, previous.bf_high)

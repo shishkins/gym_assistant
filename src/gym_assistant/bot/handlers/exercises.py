@@ -151,7 +151,7 @@ async def _list_view(
         if kind == "own":
             return ru.EXERCISES_OWN_EMPTY, keyboard
         if kind == "search":
-            return ru.EXERCISES_SEARCH_EMPTY.format(query=query), keyboard
+            return ru.EXERCISES_SEARCH_EMPTY.format(query=render.escape(query or "")), keyboard
         return ru.EXERCISES_GROUP_EMPTY, groups_keyboard(
             await service.muscle_groups(), workout_open=workout_open
         )
@@ -167,7 +167,7 @@ async def _list_view(
     elif kind == "own":
         header, back_action, back_label = ru.EXERCISES_OWN, "menu", None
     else:
-        header = ru.EXERCISES_SEARCH_RESULTS.format(query=query)
+        header = ru.EXERCISES_SEARCH_RESULTS.format(query=render.escape(query or ""))
         back_action, back_label = "menu", ru.BTN_EXIT_SEARCH
 
     if total_pages > 1:
@@ -366,7 +366,7 @@ async def hide_exercise(
         await callback.answer()
         return
 
-    name = exercise.name_ru
+    name = render.escape(exercise.name_ru)
     await service.set_hidden(user.id, exercise.id, hidden=True)
     await callback.answer()
     await _edit(callback, ru.EXERCISE_HIDDEN.format(name=name), undo_hide_keyboard(exercise.id))
@@ -382,7 +382,9 @@ async def unhide_exercise(
     await callback.answer()
     if exercise is None:
         return
-    await _edit(callback, ru.EXERCISE_RESTORED.format(name=exercise.name_ru), menu_keyboard())
+    await _edit(
+        callback, ru.EXERCISE_RESTORED.format(name=render.escape(exercise.name_ru)), menu_keyboard()
+    )
 
 
 # --- Search ---------------------------------------------------------------
@@ -476,7 +478,7 @@ async def new_type_chosen(
 
     message = callback.message
     if isinstance(message, Message):
-        await message.edit_text(ru.EXERCISE_NEW_DONE.format(name=exercise.name_ru))
+        await message.edit_text(ru.EXERCISE_NEW_DONE.format(name=render.escape(exercise.name_ru)))
         await message.answer(
             render.render_exercise_card(exercise),
             reply_markup=exercise_card_keyboard(exercise, is_favourite=False),

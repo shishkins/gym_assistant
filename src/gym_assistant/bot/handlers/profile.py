@@ -58,7 +58,7 @@ async def show_card(message: Message, session: AsyncSession, user: User) -> None
         text += ru.PROFILE_RECORDS.format(
             records="\n".join(
                 ru.PROFILE_RECORD_LINE.format(
-                    name=record.exercise_name,
+                    name=render.escape(record.exercise_name),
                     weight=render.format_weight(record.best_weight) if record.best_weight else "—",
                     reps=record.best_weight_reps or "—",
                 )

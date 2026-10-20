@@ -59,12 +59,12 @@ async def cmd_grant(
     try:
         telegram_id = int(raw_id)
     except ValueError:
-        await message.answer(ru.ADMIN_BAD_ID.format(value=raw_id))
+        await message.answer(ru.ADMIN_BAD_ID.format(value=render.escape(raw_id)))
         return
 
     role = _parse_role(raw_role)
     if role is None:
-        await message.answer(ru.ADMIN_BAD_ROLE.format(value=raw_role))
+        await message.answer(ru.ADMIN_BAD_ROLE.format(value=render.escape(raw_role)))
         return
 
     days: int | None = None
@@ -72,10 +72,10 @@ async def cmd_grant(
         try:
             days = int(rest[0])
         except ValueError:
-            await message.answer(ru.ADMIN_BAD_DAYS.format(value=rest[0]))
+            await message.answer(ru.ADMIN_BAD_DAYS.format(value=render.escape(rest[0])))
             return
         if days <= 0:
-            await message.answer(ru.ADMIN_BAD_DAYS.format(value=rest[0]))
+            await message.answer(ru.ADMIN_BAD_DAYS.format(value=render.escape(rest[0])))
             return
 
     service = AccessService(session)
@@ -189,9 +189,11 @@ async def cmd_ai_costs(message: Message, session: AsyncSession, settings: Settin
 
 
 def _who(target: User) -> str:
+    """A person's name as they set it in Telegram - so escaped: with the bot
+    open to everyone, a stranger's display name is whatever they typed."""
     if target.username:
-        return f"@{target.username}"
-    return target.first_name or str(target.telegram_id)
+        return f"@{render.escape(target.username)}"
+    return render.escape(target.first_name or str(target.telegram_id))
 
 
 def _until(expires_at: datetime | None, *, lapsed: bool) -> str:
