@@ -157,11 +157,11 @@ async def test_undo_removes_only_the_last_set(session: AsyncSession) -> None:
     await service.log(user_id, bench, parse_set_entry("80х8"), now=NOW)
     await service.log(user_id, bench, parse_set_entry("85х6"), now=NOW + timedelta(minutes=3))
 
-    removed = await service.undo_last(user_id)
+    removed = await service.undo_last(user_id, now=NOW)
 
     assert removed is not None
     assert removed.weight_kg == Decimal("85.00")
-    assert len(await service.current_sets(user_id)) == 1
+    assert len(await service.current_sets(user_id, now=NOW)) == 1
 
 
 async def test_undo_on_an_empty_session_is_harmless(session: AsyncSession) -> None:
@@ -361,6 +361,37 @@ async def test_last_time_is_the_previous_session_even_on_the_same_day(
     await service.start(user_id, now=NOW + timedelta(hours=3))
     await service.log(user_id, bench, parse_set_entry("90х3"), now=NOW + timedelta(hours=3))
 
-    history = await service.history_for(user_id, bench)
+    history = await service.history_for(user_id, bench, now=NOW + timedelta(hours=3))
     assert [(item.weight_kg, item.reps) for item in history.last_sets] == [(Decimal("80.00"), 5)]
     assert history.last_performed_at == NOW
+
+
+async def test_a_session_forgotten_on_monday_does_not_swallow_thursday(
+    session: AsyncSession,
+) -> None:
+    """The review's case: /workout on Thursday resumed Monday's session."""
+    user_id = await _user(session, 4091)
+    service = WorkoutService(session)
+    bench = await _bench(session, user_id)
+    monday = await service.start(user_id, now=NOW)
+    await service.log(user_id, bench, parse_set_entry("80х5"), now=NOW + timedelta(minutes=20))
+
+    thursday = await service.start(user_id, now=NOW + timedelta(days=3))
+
+    assert thursday.id != monday.id
+    assert monday.status == WorkoutStatus.COMPLETED.value
+    assert monday.finished_at == NOW + timedelta(minutes=20), "dated by the last set"
+
+
+async def test_a_long_session_with_recent_sets_is_not_abandoned(session: AsyncSession) -> None:
+    """Activity, not age: seven hours in, a set ten minutes ago - still running."""
+    user_id = await _user(session, 4092)
+    service = WorkoutService(session)
+    bench = await _bench(session, user_id)
+    started = await service.start(user_id, now=NOW)
+    for hours in (1, 3, 5, 7):
+        await service.log(user_id, bench, parse_set_entry("80х5"), now=NOW + timedelta(hours=hours))
+
+    again = await service.start(user_id, now=NOW + timedelta(hours=7, minutes=10))
+
+    assert again.id == started.id

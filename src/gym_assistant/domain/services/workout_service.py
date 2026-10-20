@@ -105,8 +105,36 @@ class WorkoutService:
 
     # -- session lifecycle -------------------------------------------------
 
-    async def open_workout(self, user_id: int) -> Workout | None:
-        return await self._workouts.open_workout(user_id)
+    async def open_workout(self, user_id: int, *, now: datetime | None = None) -> Workout | None:
+        """The running session - unless it was abandoned, which closes it.
+
+        Checked here, on every look, rather than only at startup: before,
+        a session forgotten on Monday was resumed by /workout on Thursday,
+        Thursday's sets landed in Monday's session, and it lasted 72 hours.
+        """
+        workout = await self._workouts.open_workout(user_id)
+        if workout is None:
+            return None
+        if await self._close_if_stale(workout, now or datetime.now(UTC)):
+            await self._session.flush()
+            return None
+        return workout
+
+    async def _close_if_stale(self, workout: Workout, moment: datetime) -> bool:
+        """Closes a session with no activity for :data:`STALE_AFTER`.
+
+        Activity, not age: a long session with a set ten minutes ago is not
+        abandoned, however early it started. Dated by the last set, because
+        the session ended when the person stopped, not when the bot noticed.
+        """
+        last = await self._workouts.last_set_at(workout.id)
+        if moment - (last or workout.started_at) <= STALE_AFTER:
+            return False
+        workout.status = (
+            WorkoutStatus.COMPLETED.value if last is not None else WorkoutStatus.CANCELLED.value
+        )
+        workout.finished_at = last or workout.started_at
+        return True
 
     async def start(self, user_id: int, *, now: datetime | None = None) -> Workout:
         """Starts a session, or returns the one already running.
@@ -114,7 +142,7 @@ class WorkoutService:
         Two quick taps are genuinely concurrent, so the partial unique index
         is the authority: on a collision we re-read rather than insert twice.
         """
-        existing = await self._workouts.open_workout(user_id)
+        existing = await self.open_workout(user_id, now=now)
         if existing is not None:
             return existing
 
@@ -132,7 +160,7 @@ class WorkoutService:
     async def finish(
         self, user_id: int, *, effort: int | None = None, now: datetime | None = None
     ) -> WorkoutSummary | None:
-        workout = await self._workouts.open_workout(user_id)
+        workout = await self.open_workout(user_id, now=now)
         if workout is None:
             return None
 
@@ -147,33 +175,23 @@ class WorkoutService:
 
         return await self.summary(workout)
 
-    async def cancel(self, user_id: int, *, now: datetime | None = None) -> bool:
-        workout = await self._workouts.open_workout(user_id)
-        if workout is None:
-            return False
-        workout.status = WorkoutStatus.CANCELLED.value
-        workout.finished_at = now or datetime.now(UTC)
-        await self._session.flush()
-        return True
-
     async def close_stale(self, *, now: datetime | None = None) -> list[Workout]:
-        """Closes sessions nobody finished. Called on startup and on demand."""
+        """Closes everyone's abandoned sessions. Run at startup.
+
+        The same rule :meth:`open_workout` applies per person; this sweep
+        only keeps sessions nobody comes back to from sitting open forever.
+        """
         moment = now or datetime.now(UTC)
-        stale = await self._workouts.stale_open(moment - STALE_AFTER)
-        for workout in stale:
-            sets = await self._workouts.sets_of(workout.id)
-            workout.status = (
-                WorkoutStatus.COMPLETED.value if sets else WorkoutStatus.CANCELLED.value
-            )
-            # Dated by the last set, not by "now": the session ended when the
-            # user stopped, not when the bot noticed.
-            workout.finished_at = sets[-1].performed_at if sets else workout.started_at
+        candidates = await self._workouts.stale_open(moment - STALE_AFTER)
+        closed = [w for w in candidates if await self._close_if_stale(w, moment)]
         await self._session.flush()
-        return stale
+        return closed
 
     # -- logging -----------------------------------------------------------
 
-    async def history_for(self, user_id: int, exercise: Exercise) -> ExerciseHistory:
+    async def history_for(
+        self, user_id: int, exercise: Exercise, *, now: datetime | None = None
+    ) -> ExerciseHistory:
         """Everything shown the moment an exercise is chosen."""
         recent = await self._workouts.recent_sets_of_exercise(user_id, exercise.id, limit=30)
         if not recent:
@@ -189,7 +207,7 @@ class WorkoutService:
         newest = recent[0]
         # "Last time" means the previous session - not the previous set, and
         # not the one running now, whose sets the panel lists separately.
-        running = await self._workouts.open_workout(user_id)
+        running = await self.open_workout(user_id, now=now)
         last_session = await self._workouts.last_session_sets(
             user_id, exercise.id, exclude_workout_id=running.id if running else None
         )
@@ -217,11 +235,11 @@ class WorkoutService:
         if not parsed.has_payload:
             raise EmptySetError("a set needs reps, time or distance")
 
-        workout = await self._workouts.open_workout(user_id)
+        moment = now or datetime.now(UTC)
+        workout = await self.open_workout(user_id, now=moment)
         if workout is None:
             raise NoOpenWorkoutError("no session is running")
 
-        moment = now or datetime.now(UTC)
         previous_best = await self._heaviest_before(user_id, exercise.id, moment)
 
         order_index, first_set_index = await self._workouts.next_indexes(workout.id, exercise.id)
@@ -265,8 +283,8 @@ class WorkoutService:
             estimate=estimate,
         )
 
-    async def undo_last(self, user_id: int) -> WorkoutSet | None:
-        workout = await self._workouts.open_workout(user_id)
+    async def undo_last(self, user_id: int, *, now: datetime | None = None) -> WorkoutSet | None:
+        workout = await self.open_workout(user_id, now=now)
         if workout is None:
             return None
         item = await self._workouts.last_set(workout.id)
@@ -277,8 +295,8 @@ class WorkoutService:
 
     # -- reading -----------------------------------------------------------
 
-    async def current_sets(self, user_id: int) -> list[WorkoutSet]:
-        workout = await self._workouts.open_workout(user_id)
+    async def current_sets(self, user_id: int, *, now: datetime | None = None) -> list[WorkoutSet]:
+        workout = await self.open_workout(user_id, now=now)
         return [] if workout is None else await self._workouts.sets_of(workout.id)
 
     async def last_completed(self, user_id: int) -> WorkoutSummary | None:

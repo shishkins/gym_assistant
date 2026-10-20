@@ -71,6 +71,11 @@ class WorkoutRepository:
         )
         return list(await self._session.scalars(stmt))
 
+    async def last_set_at(self, workout_id: int) -> datetime | None:
+        stmt = select(func.max(WorkoutSet.performed_at)).where(WorkoutSet.workout_id == workout_id)
+        moment: datetime | None = await self._session.scalar(stmt)
+        return moment
+
     # -- sets --------------------------------------------------------------
 
     async def add_set(self, item: WorkoutSet) -> WorkoutSet:
