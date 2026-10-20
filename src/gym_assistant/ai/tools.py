@@ -30,6 +30,7 @@ from gym_assistant.analytics.metrics import (
     average_weekly_volume,
     exercise_progress,
     personal_records,
+    session_count,
     total_tonnage,
     weekly_volume_by_group,
     working_sets,
@@ -85,15 +86,15 @@ async def get_training_summary(ctx: ToolContext, period: str = DEFAULT_PERIOD) -
     stats = StatsRepository(ctx.session)
     since = periods.since(period)
     sets = await stats.sets_with_exercises(ctx.user.id, since=since)
-    days = await stats.workout_days(ctx.user.id, since=since)
+    sessions = session_count(sets)
 
     return {
         "period": period,
-        "workouts": len(days),
+        "workouts": sessions,
         "sets_total": len(sets),
         "sets_working": len(working_sets(sets)),
         "tonnage_kg": _money(total_tonnage(sets)),
-        "per_workout_kg": _money(total_tonnage(sets) / len(days)) if days else None,
+        "per_workout_kg": _money(total_tonnage(sets) / sessions) if sessions else None,
     }
 
 
@@ -103,20 +104,16 @@ async def list_recent_workouts(ctx: ToolContext, limit: int = 5) -> dict[str, An
     service = WorkoutService(ctx.session)
     stats = StatsRepository(ctx.session)
 
-    sets = await stats.sets_with_exercises(ctx.user.id, since=None)
+    # Only the sessions asked for: this used to load the whole training
+    # history to show five of them.
+    sets = await stats.sets_of_recent_workouts(ctx.user.id, limit=limit)
 
-    # Pick the days first, then aggregate only those. Filtering while
-    # grouping needs the day to be known before it is added, which is the
-    # kind of loop that quietly returns one day too many.
-    wanted = sorted({clock.local_date(item.performed_at) for item in sets}, reverse=True)[:limit]
-
-    by_day: dict[str, dict[str, Any]] = {
-        day.isoformat(): {"date": day.isoformat(), "exercises": {}} for day in wanted
-    }
+    by_workout: dict[int, dict[str, Any]] = {}
     for item in sets:
-        entry = by_day.get(clock.local_date(item.performed_at).isoformat())
-        if entry is None:
-            continue
+        entry = by_workout.setdefault(
+            item.workout_id,
+            {"date": clock.local_date(item.performed_at).isoformat(), "exercises": {}},
+        )
         name = item.exercise.name_ru if item.exercise else "?"
         block = entry["exercises"].setdefault(name, {"sets": 0, "top_weight_kg": None})
         block["sets"] += 1
@@ -128,7 +125,7 @@ async def list_recent_workouts(ctx: ToolContext, limit: int = 5) -> dict[str, An
 
     last = await service.last_completed(ctx.user.id)
     return {
-        "workouts": list(by_day.values()),
+        "workouts": list(by_workout.values()),
         "last_finished_at": (
             last.workout.finished_at.isoformat() if last and last.workout.finished_at else None
         ),

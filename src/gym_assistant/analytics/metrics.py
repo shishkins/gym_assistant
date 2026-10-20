@@ -105,6 +105,18 @@ class ProgressPoint:
     best_estimate: Decimal | None
 
 
+def session_count(sets: Iterable[WorkoutSet]) -> int:
+    """How many sessions these sets came from.
+
+    Counted from the sets themselves, so the count and the sets always
+    describe the same thing. It used to be the number of DAYS with a
+    COMPLETED session, set against sets from every session including the
+    one running - which inflated "per workout" mid-session and counted two
+    sessions on one day as one.
+    """
+    return len({item.workout_id for item in sets})
+
+
 def week_start(moment: datetime | date) -> date:
     """Monday of the week this moment falls in, by the bot's clock."""
     day = clock.local_date(moment) if isinstance(moment, datetime) else moment

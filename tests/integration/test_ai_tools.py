@@ -171,3 +171,36 @@ async def test_an_unknown_tool_raises(session: AsyncSession) -> None:
 
     with pytest.raises(LookupError):
         await run_tool(ctx, "drop_everything", {})
+
+
+async def test_two_sessions_on_one_day_are_two_workouts(session: AsyncSession) -> None:
+    """The review: "workouts" counted days, so a morning and an evening
+    session were one workout, and tonnage per workout doubled."""
+    from gym_assistant.ai.tools import get_training_summary, list_recent_workouts
+
+    user = await ProfileService(session).get_or_create_user(5077)
+    bench = (await ExerciseService(session).search("бенч", user_id=user.id))[0]
+    workouts = WorkoutService(session)
+    morning = datetime.now(UTC) - timedelta(days=1)
+    for when in (morning, morning + timedelta(hours=9)):
+        await workouts.start(user.id, now=when)
+        await workouts.log(user.id, bench, parse_set_entry("100х5"), now=when)
+        await workouts.finish(user.id, now=when + timedelta(hours=1))
+    ctx = ToolContext(session=session, user=user)
+
+    summary = await get_training_summary(ctx, period="1m")
+    recent = await list_recent_workouts(ctx, limit=5)
+
+    assert summary["workouts"] == 2
+    assert summary["per_workout_kg"] == 500.0
+    assert len(recent["workouts"]) == 2
+
+
+async def test_recent_workouts_returns_only_as_many_as_asked(session: AsyncSession) -> None:
+    from gym_assistant.ai.tools import list_recent_workouts
+
+    ctx = await _seed(session, 5078, weeks=6)
+
+    recent = await list_recent_workouts(ctx, limit=2)
+
+    assert len(recent["workouts"]) == 2

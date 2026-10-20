@@ -16,6 +16,7 @@ from gym_assistant.analytics import charts, export, periods
 from gym_assistant.analytics.metrics import (
     moving_average,
     personal_records,
+    session_count,
     total_tonnage,
     weekly_volume_by_group,
     working_sets,
@@ -51,10 +52,9 @@ async def _menu(session: AsyncSession, user: User, period: str) -> tuple[str, In
     stats = StatsRepository(session)
     since = periods.since(period)
     sets = await stats.sets_with_exercises(user.id, since=since)
-    days = await stats.workout_days(user.id, since=since)
 
     text = ru.STATS_MENU.format(
-        period=ru.STATS_PERIOD_LABELS[period], workouts=len(days), sets=len(sets)
+        period=ru.STATS_PERIOD_LABELS[period], workouts=session_count(sets), sets=len(sets)
     )
     return text, menu_keyboard(period)
 
@@ -352,7 +352,7 @@ async def _summary(message: Message, session: AsyncSession, user: User, period: 
     stats = StatsRepository(session)
     since = periods.since(period)
     sets = await stats.sets_with_exercises(user.id, since=since)
-    days = await stats.workout_days(user.id, since=since)
+    sessions = session_count(sets)
 
     if not sets:
         await message.answer(
@@ -362,11 +362,11 @@ async def _summary(message: Message, session: AsyncSession, user: User, period: 
         return
 
     tonnage = total_tonnage(sets)
-    per_workout = tonnage / Decimal(len(days)) if days else Decimal(0)
+    per_workout = tonnage / Decimal(sessions) if sessions else Decimal(0)
     await message.answer(
         ru.STATS_SUMMARY.format(
             period=ru.STATS_PERIOD_LABELS[period],
-            workouts=len(days),
+            workouts=sessions,
             sets=len(sets),
             working=len(working_sets(sets)),
             tonnage=render.format_weight(tonnage.quantize(Decimal("1"))),

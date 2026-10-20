@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, Select, cast, func, select
+from sqlalchemy import Date, Select, cast, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -49,6 +49,26 @@ class StatsRepository:
                 selectinload(WorkoutSet.exercise).selectinload(Exercise.secondary_muscle_groups),
             )
             .order_by(WorkoutSet.performed_at)
+        )
+        return list(await self._session.scalars(stmt))
+
+    async def sets_of_recent_workouts(self, user_id: int, *, limit: int) -> list[WorkoutSet]:
+        """Sets of the last ``limit`` sessions that have any, newest session first."""
+        recent = (
+            select(Workout.id)
+            .where(
+                Workout.user_id == user_id,
+                exists().where(WorkoutSet.workout_id == Workout.id),
+            )
+            .order_by(Workout.started_at.desc())
+            .limit(limit)
+        )
+        stmt = (
+            select(WorkoutSet)
+            .join(Workout, Workout.id == WorkoutSet.workout_id)
+            .where(WorkoutSet.workout_id.in_(recent.scalar_subquery()))
+            .options(selectinload(WorkoutSet.exercise))
+            .order_by(Workout.started_at.desc(), WorkoutSet.performed_at)
         )
         return list(await self._session.scalars(stmt))
 
