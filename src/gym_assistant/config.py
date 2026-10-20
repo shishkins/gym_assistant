@@ -43,33 +43,30 @@ class Settings(BaseSettings):
     # --- Redis ---
     redis_url: str = "redis://redis:6379/0"
 
-    # --- Anthropic (iteration 5+; may stay unset until then) ---
+    # --- Anthropic ---
     anthropic_api_key: SecretStr | None = None
-    ai_model_main: str = "claude-opus-5"
-    ai_model_fast: str = "claude-haiku-4-5"
-    # Reading a photo of a plate is extraction, not reasoning, so the cheap
-    # model was the obvious pick - and measuring said otherwise. Over nine
-    # photos, three runs each, Haiku swung 25% against Sonnet's 9% and read a
-    # legible drink label as water. Pinned rather than merely defaulted: the
-    # adaptive TDEE absorbs a steady bias and cannot absorb a moving one, so
-    # swapping this mid-history is a data decision, not a config tweak.
+    # The default is what production actually runs. It used to be Opus, five
+    # times the price, so a .env that lost this one line would have quietly
+    # multiplied the bill rather than failed.
+    ai_model_main: str = "claude-sonnet-5"
+    # Reading a body photo. Pinned rather than merely defaulted: estimates are
+    # compared with each other over months, and a different model reads the
+    # same photo with a different bias - so changing this mid-history moves
+    # every trend line, not just the next number. Sonnet over the cheaper
+    # Haiku on measurement, not taste: on real photos Haiku swung 25% between
+    # identical runs against Sonnet's 9%.
     ai_model_vision: str = "claude-sonnet-5"
-
-    # Which clock a day is counted by. Rows stay UTC; this only decides
-    # where one day ends and the next begins when they are read back.
-    #
-    # A food diary needs this in a way a workout log does not: dinner at
-    # one in the morning in Vietnam is seven in the evening UTC of the day
-    # before, so counting by UTC files it under yesterday. One setting for
-    # the whole bot rather than one per person - everyone using it lives in
-    # the same place, and the day a per-user field is worth its weight is
-    # the day that stops being true.
-    timezone: str = "UTC"
     ai_monthly_limit_usd: float = 10.0
 
-    # --- Speech to text (iteration 6+) ---
-    stt_url: str = "http://stt:8000"
-    stt_model: str = "small"
+    # --- Clock ---
+    # Which clock a day and a week are counted by. Rows stay UTC; this only
+    # decides where one day ends and the next begins when they are grouped.
+    # A session at six on a Monday morning in Vietnam is eleven on Sunday
+    # night UTC, so counting by UTC files it under the previous week. One
+    # setting for the whole bot rather than one per person: everyone using it
+    # lives in the same place, and a per-user field earns its keep on the day
+    # that stops being true.
+    timezone: str = "UTC"
 
     @staticmethod
     def _ids(raw: str) -> frozenset[int]:

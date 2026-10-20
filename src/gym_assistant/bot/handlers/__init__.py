@@ -5,9 +5,6 @@ Order is behaviour, not style:
 * ``menu`` next, so /menu is reachable from inside one too;
 * ``onboarding`` before ``profile``, because both answer the same callback
   payloads and onboarding claims them only while its states are set;
-* ``meals`` before ``measurements``, because both answer a photo: a meal
-  being clarified owns the next picture, and anything else is a progress
-  shot;
 * ``workouts`` before ``exercises``, because a running session owns free
   text: what you type between reps is a set, not a catalogue search;
 * ``admin`` early, because its whole router is filtered on the admin
@@ -23,7 +20,6 @@ from gym_assistant.bot.handlers import (
     common,
     exercises,
     fallback,
-    meals,
     measurements,
     menu,
     onboarding,
@@ -42,7 +38,6 @@ def get_routers() -> tuple[Router, ...]:
         menu.router,
         onboarding.router,
         profile.router,
-        meals.router,
         measurements.router,
         workouts.router,
         stats.router,

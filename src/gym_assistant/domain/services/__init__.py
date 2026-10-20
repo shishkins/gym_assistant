@@ -6,7 +6,6 @@ from gym_assistant.domain.services.exercise_service import (
     DuplicateExerciseError,
     ExerciseService,
 )
-from gym_assistant.domain.services.meal_service import DayTotals, MealService
 from gym_assistant.domain.services.measurement_service import (
     EmptyMeasurementError,
     MeasurementService,
@@ -25,14 +24,12 @@ __all__ = [
     "Access",
     "AccessService",
     "CatalogueStats",
-    "DayTotals",
     "DuplicateExerciseError",
     "EmptyMeasurementError",
     "EmptySetError",
     "ExerciseHistory",
     "ExerciseService",
     "LoggedSets",
-    "MealService",
     "MeasurementService",
     "NoOpenWorkoutError",
     "ProfileService",

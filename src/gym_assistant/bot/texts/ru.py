@@ -311,7 +311,6 @@ BTN_MENU_WORKOUT = "🏋️ Тренировка"
 BTN_MENU_EXERCISES = "📖 Упражнения"
 BTN_MENU_PROFILE = "👤 Профиль"
 BTN_MENU_WEIGHT = "⚖️ Записать вес"
-BTN_MENU_FOOD = "🍽 Питание"
 BTN_MENU_PHOTOS = "📸 Фото прогресса"
 BTN_MENU_HELP = "❔ Что я умею"
 
@@ -627,91 +626,3 @@ ADMIN_AI_COSTS = (
 )
 ADMIN_AI_COST_LINE = "{who} — ${cost} · {calls} вызовов"
 ADMIN_AI_COSTS_NOBODY = "Ассистентом ещё никто не пользовался."
-
-# --- Food diary ------------------------------------------------------------
-
-MEAL_LOOKING = "👀 Смотрю, что на тарелке…"
-
-MEAL_CARD = "🍽 <b>{total} ккал</b>\nБ {protein} · Ж {fat} · У {carb}\n\n{items}"
-MEAL_ITEM_LINE = "  • {name} — <b>{grams} г</b> · {kcal} ккал"
-# Shown only where the model admitted it was guessing: a warning on every
-# line is a warning nobody reads.
-MEAL_ITEM_UNSURE = "  • {name} — <b>{grams} г</b> · {kcal} ккал  <i>(на глаз)</i>"
-
-MEAL_QUESTION = "\n\n❓ <i>{question}</i>\n<i>Ответьте сообщением — пересчитаю.</i>"
-
-MEAL_CLARIFY = (
-    "Чем помочь разбору? Любым из этого — как удобнее:\n\n"
-    "📄 <b>Фото меню или экрана доставки</b> — там название"
-    " и часто граммовка, это точнее всего.\n\n"
-    "📏 <b>Фото с предметом для масштаба</b> — вилка, ладонь, телефон рядом с тарелкой.\n\n"
-    "✍️ <b>Просто напишите</b> — «тарелка 30 см», «стакан 0.5»,"
-    " «порция была большая», «это бургер, а не сэндвич».\n\n"
-    "Или /cancel, чтобы оставить как есть."
-)
-
-MEAL_RETHINKING = "🤔 Пересчитываю с учётом подсказки…"
-
-MEAL_SAVED = "✅ Записал: <b>{total} ккал</b>\nСегодня всего: <b>{today} ккал</b>"
-MEAL_UNDONE = "↩️ Убрал запись."
-MEAL_NOTHING_TO_UNDO = "Отменять нечего."
-MEAL_DISCARDED = "Выбросил. Пришлите другое фото, если хотите записать."
-
-MEAL_NOT_FOOD = (
-    "На фото не еда — сохранил как фото прогресса.\n\n"
-    "<i>Если это всё-таки была еда, пришлите снимок, где её лучше видно.</i>"
-)
-MEAL_EMPTY = "Разобрал фото, но еды на нём не нашёл. Попробуйте снимок поближе."
-MEAL_FAILED = "Не смог разобрать фото. Попробуйте ещё раз через минуту."
-# A failed clarification must not cost the breakdown that was already on
-# screen: the person asked for MORE, and ended up with less.
-MEAL_RETHINK_FAILED = (
-    "Не смог учесть подсказку — оставил разбор как был.\n\n"
-    "Можно попробовать ещё раз или записать как есть."
-)
-# Said out loud, because after the first screenshot the card came back
-# looking identical and there was no way to tell it had been read at all.
-MEAL_RETHOUGHT = "📄 Учёл подсказку — пересчитал."
-MEAL_RETHOUGHT_SAME = "📄 Подсказку учёл, но разбор не изменился."
-MEAL_EXPIRED = "Эта карточка уже неактуальна — пришлите фото заново."
-
-MEAL_DAY_EMPTY = (
-    "Сегодня ещё ничего не записано.\n\n"
-    "Пришлите фото тарелки — разберу и посчитаю. Если что-то видно плохо, можно следом"
-    " прислать экран из доставки или просто написать размер: «тарелка 30 см»."
-)
-MEAL_DAY = (
-    "🍽 <b>{title}</b>\n\n"
-    "<b>{total} ккал</b> за {meals}\n"
-    "Б {protein} · Ж {fat} · У {carb}\n\n"
-    "{lines}"
-)
-MEAL_DAY_LINE = "  {when} · {name} — <b>{kcal}</b> ккал"
-MEAL_DAY_NOTHING = "🍽 <b>{title}</b>\n\nНичего не записано."
-
-MEAL_WEEK = (
-    "📅 <b>Последние 7 дней</b>\n\n{lines}\n\nВ среднем за день с записями: <b>{average} ккал</b>"
-)
-MEAL_WEEK_LINE = "  {day} · <b>{kcal}</b> ккал · {meals}"
-MEAL_WEEK_EMPTY_LINE = "  {day} · —"
-MEAL_WEEK_NOTHING = (
-    "📅 За неделю ничего не записано.\n\nПришлите фото тарелки — разберу и посчитаю."
-)
-
-MEAL_PICK_TO_DELETE = "Какой приём убрать?"
-
-BTN_MEAL_PREV_DAY = "← Вчера"
-BTN_MEAL_NEXT_DAY = "Позже →"
-BTN_MEAL_WEEK = "📅 Неделя"
-BTN_MEAL_TODAY = "Сегодня"
-BTN_MEAL_DELETE_ONE = "🗑 Убрать приём"
-
-BTN_MEAL_SAVE = "✅ Записать"
-BTN_MEAL_CLARIFY = "✏️ Уточнить"
-BTN_MEAL_DISCARD = "🗑 Не то"
-BTN_MEAL_UNDO = "↩️ Отменить"
-# Multipliers rather than a numeric editor: the whole error lives in the
-# portion, and half of it is caught by "это была половина".
-BTN_MEAL_HALF = "½ порции"
-BTN_MEAL_ONE_AND_HALF = "1½ порции"
-BTN_MEAL_DOUBLE = "2 порции"
