@@ -313,7 +313,13 @@ class WorkoutService:
         # A hidden or deleted exercise drops out rather than breaking the row.
         return [exercise for exercise in found if exercise is not None]
 
-    async def summary(self, workout: Workout) -> WorkoutSummary:
+    async def summary(self, workout: Workout, *, with_records: bool = True) -> WorkoutSummary:
+        """What a session amounted to.
+
+        ``with_records=False`` for the live panel: it never shows records,
+        and finding them reads each exercise's whole history - once per
+        exercise, on every set logged.
+        """
         sets = await self._workouts.sets_of(workout.id)
 
         grouped: dict[int, list[WorkoutSet]] = {}
@@ -323,12 +329,14 @@ class WorkoutService:
         by_exercise: list[tuple[Exercise, list[WorkoutSet]]] = []
         records: list[tuple[Exercise, Decimal]] = []
         for exercise_id, items in grouped.items():
-            exercise = await self._exercises.get(exercise_id, user_id=workout.user_id)
-            if exercise is None:
+            # Reachable, not visible: hiding an exercise from the catalogue
+            # must not erase it from the sessions it was done in.
+            exercise = await self._exercises.get_reachable(exercise_id, user_id=workout.user_id)
+            if exercise is None:  # pragma: no cover - sets keep their exercise by FK
                 continue
             by_exercise.append((exercise, items))
 
-            achieved = heaviest_weight(items)
+            achieved = heaviest_weight(items) if with_records else None
             if achieved is None:
                 continue
             before = await self._heaviest_before(workout.user_id, exercise_id, workout.started_at)

@@ -395,3 +395,20 @@ async def test_a_long_session_with_recent_sets_is_not_abandoned(session: AsyncSe
     again = await service.start(user_id, now=NOW + timedelta(hours=7, minutes=10))
 
     assert again.id == started.id
+
+
+async def test_hiding_an_exercise_keeps_it_in_past_sessions(session: AsyncSession) -> None:
+    """The review: hide bench press and /last dropped its sets, while the
+    tonnage still counted them."""
+    user_id = await _user(session, 4093)
+    service = WorkoutService(session)
+    bench = await _bench(session, user_id)
+    await service.start(user_id, now=NOW)
+    await service.log(user_id, bench, parse_set_entry("80х5"), now=NOW)
+    await service.finish(user_id, now=NOW + timedelta(minutes=30))
+
+    await ExerciseService(session).set_hidden(user_id, bench.id, hidden=True)
+    summary = await service.last_completed(user_id)
+
+    assert summary is not None
+    assert [exercise.id for exercise, _ in summary.by_exercise] == [bench.id]

@@ -56,7 +56,7 @@ async def _panel(service: WorkoutService, user: User) -> tuple[str, InlineKeyboa
     if workout is None:
         return ru.WORKOUT_NONE_OPEN, start_keyboard(is_open=False)
 
-    summary = await service.summary(workout)
+    summary = await service.summary(workout, with_records=False)
     frequent = await service.frequent_exercises(user.id)
     text = render.render_workout_panel(
         duration_min=summary.duration_min,

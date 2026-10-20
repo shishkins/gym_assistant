@@ -542,7 +542,10 @@ class Workout(Base, TimestampMixin):
         back_populates="workout",
         cascade="all, delete-orphan",
         order_by="WorkoutSet.performed_at",
-        lazy="selectin",
+        # Was "selectin", read by nothing: every open_workout() - several
+        # per set logged - loaded all the sets with their exercises.
+        # Sets are fetched through the repository instead.
+        lazy="raise",
     )
 
     @property

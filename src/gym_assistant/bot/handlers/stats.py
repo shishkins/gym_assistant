@@ -267,7 +267,9 @@ async def exercise_progress(
     if not isinstance(message, Message):
         return
 
-    exercise = await ExerciseService(session).get(callback_data.exercise_id, user_id=user.id)
+    exercise = await ExerciseService(session).get_reachable(
+        callback_data.exercise_id, user_id=user.id
+    )
     if exercise is None:
         return
 

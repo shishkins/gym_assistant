@@ -53,6 +53,10 @@ class ExerciseService:
     async def get(self, exercise_id: int, *, user_id: int) -> Exercise | None:
         return await self._exercises.get(exercise_id, user_id=user_id)
 
+    async def get_reachable(self, exercise_id: int, *, user_id: int) -> Exercise | None:
+        """For history: hidden or not, what this user did is theirs."""
+        return await self._exercises.get_reachable(exercise_id, user_id=user_id)
+
     async def is_favourite(self, user_id: int, exercise_id: int) -> bool:
         return await self._exercises.is_favourite(user_id, exercise_id)
 
