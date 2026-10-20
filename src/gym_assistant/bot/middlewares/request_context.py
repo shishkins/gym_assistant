@@ -5,11 +5,12 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from typing import Any
 
 import structlog
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, User
+from aiogram.types import CallbackQuery, Message, TelegramObject, Update, User
 
 from gym_assistant.bot.texts import ru
 
@@ -29,7 +30,9 @@ class LoggingMiddleware(BaseMiddleware):
         structlog.contextvars.bind_contextvars(
             request_id=uuid.uuid4().hex[:12],
             user_id=user.id if user else None,
-            update_type=type(event).__name__,
+            # The middleware sits on the update, so the class is always
+            # "Update"; what happened is one level down.
+            update_type=event.event_type if isinstance(event, Update) else type(event).__name__,
         )
 
         started = time.perf_counter()
@@ -45,12 +48,25 @@ class LoggingMiddleware(BaseMiddleware):
 
     @staticmethod
     async def _notify_user(event: TelegramObject) -> None:
-        """Never leave a user staring at silence after a crash."""
-        answer = getattr(event, "answer", None)
-        if answer is None:
+        """Never leave a user staring at silence after a crash.
+
+        The event here is the whole ``Update``, which has no ``answer`` of its
+        own - looking for one on it is what kept every crash silent until the
+        2026-10-20 review. The message or the button press inside is what
+        can be answered; a press also has its spinner stopped.
+        """
+        inner = event.event if isinstance(event, Update) else event
+        target: Message | None = None
+        if isinstance(inner, CallbackQuery):
+            with suppress(Exception):
+                await inner.answer()
+            target = inner.message if isinstance(inner.message, Message) else None
+        elif isinstance(inner, Message):
+            target = inner
+        if target is None:
             return
         try:
-            await answer(ru.UNEXPECTED_ERROR)
+            await target.answer(ru.UNEXPECTED_ERROR)
         except Exception:
             # Swallowed on purpose: the original failure is the one that matters.
             log.warning("error_notification_failed")
