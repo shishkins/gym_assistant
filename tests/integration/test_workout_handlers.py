@@ -608,3 +608,19 @@ async def test_a_command_during_a_session_is_a_command_not_an_exercise(bot: BotH
 
     assert "Не нашёл упражнение" not in bot.session.last_text
     assert "/stats" not in bot.session.last_text
+
+
+async def test_the_menu_does_not_knock_you_out_of_a_session(
+    bot: BotHarness, session: AsyncSession
+) -> None:
+    """The review: /menu cleared the workout state, and Menu -> Exercises
+    turned typed sets into catalogue searches."""
+    from gym_assistant.bot.keyboards import MainMenuCB
+
+    await bot.send("/workout")
+    await bot.send("/menu")
+    await bot.tap(MainMenuCB(action="exercises").pack())
+
+    await bot.send("жим 80х8")
+
+    assert len(await _sets(session)) == 1, "подход после меню не записался"
