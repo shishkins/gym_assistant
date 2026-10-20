@@ -172,6 +172,11 @@ async def workout_action(
     user: User,
 ) -> None:
     service = WorkoutService(session)
+    if callback_data.action == "lbs":
+        # Answers the press itself, with a toast saying which mode is on;
+        # answering here as well was a second answer Telegram rejects.
+        await _toggle_lbs(callback, session, state, user)
+        return
     await callback.answer()
 
     match callback_data.action:
@@ -206,9 +211,6 @@ async def workout_action(
 
         case "technique":
             await _technique(callback, session, state, user)
-
-        case "lbs":
-            await _toggle_lbs(callback, session, state, user)
 
         case "catalogue":
             # The session stays open; the catalogue offers a way back.

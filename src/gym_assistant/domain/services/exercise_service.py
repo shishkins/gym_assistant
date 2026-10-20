@@ -128,7 +128,13 @@ class ExerciseService:
 
     # -- per-user preferences ---------------------------------------------
 
+    async def _own_or_catalogue(self, user_id: int, exercise_id: int) -> None:
+        """The id comes from button data, which a client can forge."""
+        if await self._exercises.get_reachable(exercise_id, user_id=user_id) is None:
+            raise LookupError(f"exercise {exercise_id} is not reachable by user {user_id}")
+
     async def toggle_favourite(self, user_id: int, exercise_id: int) -> bool:
+        await self._own_or_catalogue(user_id, exercise_id)
         preference = await self._exercises.preference(user_id, exercise_id)
         preference.is_favourite = not preference.is_favourite
         await self._session.flush()
@@ -140,6 +146,7 @@ class ExerciseService:
         Deliberately not a copy of the exercise: a copy would drift from the
         original and duplicate every future catalogue update.
         """
+        await self._own_or_catalogue(user_id, exercise_id)
         preference = await self._exercises.preference(user_id, exercise_id)
         preference.is_hidden = hidden
         await self._session.flush()

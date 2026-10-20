@@ -345,6 +345,11 @@ async def toggle_favourite(
     callback: CallbackQuery, callback_data: ExFavCB, session: AsyncSession, user: User
 ) -> None:
     service = ExerciseService(session)
+    # Checked first so the press is answered exactly once: _show_card answers
+    # it too when the exercise is gone, and Telegram rejects a second answer.
+    if await service.get(callback_data.exercise_id, user_id=user.id) is None:
+        await callback.answer(ru.EXERCISES_GROUP_EMPTY, show_alert=True)
+        return
     added = await service.toggle_favourite(user.id, callback_data.exercise_id)
     await callback.answer(ru.EXERCISE_FAV_ADDED if added else ru.EXERCISE_FAV_REMOVED)
     await _show_card(
@@ -377,7 +382,11 @@ async def unhide_exercise(
     callback: CallbackQuery, callback_data: ExUnhideCB, session: AsyncSession, user: User
 ) -> None:
     service = ExerciseService(session)
-    await service.set_hidden(user.id, callback_data.exercise_id, hidden=False)
+    try:
+        await service.set_hidden(user.id, callback_data.exercise_id, hidden=False)
+    except LookupError:
+        await callback.answer()
+        return
     exercise = await service.get(callback_data.exercise_id, user_id=user.id)
     await callback.answer()
     if exercise is None:

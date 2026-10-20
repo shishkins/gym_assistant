@@ -60,6 +60,21 @@ class ExerciseRepository:
         exercise: Exercise | None = await self._session.scalar(stmt)
         return exercise
 
+    async def get_reachable(self, exercise_id: int, *, user_id: int) -> Exercise | None:
+        """A catalogue entry or one of the user's own - hidden or retired too.
+
+        Not for listing: :meth:`get` decides what is shown. This answers
+        "may this user refer to it at all", which hiding does not change -
+        a hidden exercise can be unhidden, and last month's sets of it are
+        still that person's history.
+        """
+        stmt = select(Exercise).where(
+            Exercise.id == exercise_id,
+            or_(Exercise.owner_user_id.is_(None), Exercise.owner_user_id == user_id),
+        )
+        exercise: Exercise | None = await self._session.scalar(stmt)
+        return exercise
+
     async def by_slug(self, slug: str, *, user_id: int) -> Exercise | None:
         stmt = (
             select(Exercise)

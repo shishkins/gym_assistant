@@ -99,6 +99,16 @@ class RecordingSession(BaseSession):
         ]
 
     @property
+    def callback_answers(self) -> int:
+        """How many times a button press was answered.
+
+        Telegram accepts exactly one answer per press and rejects the rest
+        with a 400 - which in production swallowed the toast and the panel
+        update that came after it.
+        """
+        return sum(1 for call in self.calls if type(call).__name__ == "AnswerCallbackQuery")
+
+    @property
     def last_text(self) -> str:
         return self.texts[-1]
 
