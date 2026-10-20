@@ -306,6 +306,61 @@ class BodyMeasurement(Base, TimestampMixin):
         return f"<BodyMeasurement id={self.id} user_id={self.user_id} at={self.measured_at}>"
 
 
+class BodyEstimate(Base, TimestampMixin):
+    """A body-fat band read off one progress photo, and what produced it.
+
+    Not a column on ``body_measurements``: ``body_fat_pct`` there is a
+    number the person typed, from calipers or a scale, and stays theirs. This
+    is a model's reading, and it is only meaningful together with its band,
+    the model and the prompt version - two estimates are compared only when
+    those last two match, because a different reader has a different bias.
+
+    The weight and height used for the kilograms are copied in, not joined:
+    a weigh-in edited later must not silently rewrite an old estimate.
+    """
+
+    __tablename__ = "body_estimates"
+    __table_args__ = (
+        Index("ix_body_estimates_user_measured", "user_id", "measured_at"),
+        Index("ix_body_estimates_measurement", "measurement_id"),
+        CheckConstraint(
+            "bf_low BETWEEN 3 AND 60 AND bf_high BETWEEN 3 AND 60 "
+            "AND bf_low <= bf_likely AND bf_likely <= bf_high",
+            name="ck_body_estimates_band",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # The photo's row. Kept nullable so deleting a photo does not take the
+    # history of estimates with it.
+    measurement_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("body_measurements.id", ondelete="SET NULL")
+    )
+    # When the photo was taken, not when it was read: trends run on this.
+    measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    photo_file_id: Mapped[str] = mapped_column(Text, nullable=False)
+
+    bf_low: Mapped[Decimal] = mapped_column(Numeric(4, 1), nullable=False)
+    bf_likely: Mapped[Decimal] = mapped_column(Numeric(4, 1), nullable=False)
+    bf_high: Mapped[Decimal] = mapped_column(Numeric(4, 1), nullable=False)
+
+    weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    height_cm: Mapped[int | None] = mapped_column(SmallInteger)
+
+    observations: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    limits: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_version: Mapped[str] = mapped_column(Text, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<BodyEstimate id={self.id} user_id={self.user_id} bf={self.bf_likely}>"
+
+
 class MuscleGroup(Base):
     """Reference list. Seeded once and rarely touched."""
 

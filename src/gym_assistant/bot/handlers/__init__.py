@@ -17,6 +17,7 @@ from aiogram import Router
 from gym_assistant.bot.handlers import (
     admin,
     ai,
+    body,
     common,
     exercises,
     fallback,
@@ -35,6 +36,7 @@ def get_routers() -> tuple[Router, ...]:
         admin.router,
         admin.public_router,
         ai.router,
+        body.router,
         menu.router,
         onboarding.router,
         profile.router,

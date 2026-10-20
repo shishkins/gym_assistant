@@ -1,5 +1,6 @@
 """Inline keyboards and their callback payloads."""
 
+from gym_assistant.bot.keyboards.body import BodyCB, body_keyboard
 from gym_assistant.bot.keyboards.common import CancelCB, cancel_button, cancel_keyboard, with_cancel
 from gym_assistant.bot.keyboards.exercises import (
     EQUIPMENT_BY_VALUE,
@@ -51,6 +52,7 @@ __all__ = [
     "CHOICE_ENUMS",
     "EQUIPMENT_BY_VALUE",
     "TYPE_BY_VALUE",
+    "BodyCB",
     "CancelCB",
     "ChoiceCB",
     "EditCB",
@@ -70,6 +72,7 @@ __all__ = [
     "WorkoutFavCB",
     "WorkoutSearchPageCB",
     "back_to_panel_keyboard",
+    "body_keyboard",
     "cancel_button",
     "cancel_keyboard",
     "exercise_card_keyboard",

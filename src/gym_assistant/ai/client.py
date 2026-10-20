@@ -61,15 +61,6 @@ class Answer:
     turns: list[dict[str, Any]] = field(default_factory=list)
 
 
-def _tokens_from(usage: Any) -> Tokens:
-    return Tokens(
-        input=getattr(usage, "input_tokens", 0) or 0,
-        output=getattr(usage, "output_tokens", 0) or 0,
-        cache_read=getattr(usage, "cache_read_input_tokens", 0) or 0,
-        cache_write=getattr(usage, "cache_creation_input_tokens", 0) or 0,
-    )
-
-
 def _add(left: Tokens, right: Tokens) -> Tokens:
     return Tokens(
         input=left.input + right.input,
@@ -125,7 +116,7 @@ class AiAssistant:
         for _ in range(MAX_TOOL_ROUNDS):
             response = await self._create(messages)
 
-            tokens = _tokens_from(response.usage)
+            tokens = Tokens.of(response.usage)
             spent = _add(spent, tokens)
             cost += await self._usage.record(
                 user_id=ctx.user.id,

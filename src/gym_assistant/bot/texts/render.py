@@ -2,14 +2,28 @@
 
 from __future__ import annotations
 
+import html
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from urllib.parse import quote_plus
 
 from gym_assistant.bot.texts import ru
-from gym_assistant.domain.models import Equipment, Exercise, ExerciseType, WorkoutSet
-from gym_assistant.domain.services import ExerciseHistory, ProfileSummary, WorkoutSummary
+from gym_assistant.domain import body
+from gym_assistant.domain.models import (
+    BodyEstimate,
+    Equipment,
+    Exercise,
+    ExerciseType,
+    Sex,
+    WorkoutSet,
+)
+from gym_assistant.domain.services import (
+    ExerciseHistory,
+    ProfileSummary,
+    WeighIn,
+    WorkoutSummary,
+)
 
 
 def format_decimal(value: Decimal) -> str:
@@ -287,3 +301,92 @@ def render_workout_summary(summary: WorkoutSummary) -> str:
             )
         )
     return text
+
+
+def render_body_estimate(
+    estimate: BodyEstimate,
+    *,
+    weigh_in: WeighIn | None,
+    height_cm: int | None,
+    sex: Sex | None,
+    previous: BodyEstimate | None,
+    unusable: bool = False,
+) -> str:
+    """One estimate as a message: the band, the kilograms, and how far to trust them.
+
+    The observations and limits are the model's words and go out escaped:
+    they land in an HTML message, and a stray "<" from the model would make
+    Telegram refuse the whole reply.
+    """
+    band = body.Band(estimate.bf_low, estimate.bf_likely, estimate.bf_high)
+    parts = [
+        ru.BODY_HEADER.format(date=format_date(estimate.measured_at.date())),
+        ru.BODY_FAT.format(
+            low=format_decimal(band.low),
+            likely=format_decimal(band.likely),
+            high=format_decimal(band.high),
+        ),
+    ]
+    if unusable:
+        parts.append(ru.BODY_UNUSABLE)
+
+    if weigh_in is None:
+        parts.append(ru.BODY_NO_WEIGHT)
+    elif not weigh_in.fresh:
+        parts.append(
+            ru.BODY_STALE_WEIGHT.format(
+                weight=format_weight(weigh_in.weight_kg),
+                when=format_when(weigh_in.measured_at),
+            )
+        )
+    else:
+        mass = body.composition(band, weigh_in.weight_kg, height_cm)
+        parts.append(
+            ru.BODY_MASSES.format(
+                weight=format_weight(weigh_in.weight_kg),
+                when=format_when(weigh_in.measured_at),
+                fat_low=format_decimal(mass.fat_kg.low),
+                fat_high=format_decimal(mass.fat_kg.high),
+                lean_low=format_decimal(mass.lean_kg.low),
+                lean_high=format_decimal(mass.lean_kg.high),
+            )
+        )
+        if mass.ffmi is not None and mass.ffmi_normalized is not None:
+            parts.append(
+                ru.BODY_FFMI.format(
+                    ffmi=format_decimal(mass.ffmi),
+                    normalized=format_decimal(mass.ffmi_normalized),
+                )
+            )
+        else:
+            parts.append(ru.BODY_NO_HEIGHT)
+
+    if estimate.observations:
+        parts.append(
+            ru.BODY_SEEN.format(
+                observations=html.escape("; ".join(str(line) for line in estimate.observations))
+            )
+        )
+    if estimate.limits:
+        parts.append(ru.BODY_LIMITS.format(limits=html.escape(estimate.limits)))
+
+    if previous is not None:
+        before = body.Band(previous.bf_low, previous.bf_likely, previous.bf_high)
+        template = {
+            body.Trend.SAME: ru.BODY_TREND_SAME,
+            body.Trend.DOWN: ru.BODY_TREND_DOWN,
+            body.Trend.UP: ru.BODY_TREND_UP,
+        }[body.trend(before, band)]
+        parts.append(
+            template.format(
+                date=format_date(previous.measured_at.date()),
+                previous=format_decimal(previous.bf_likely),
+                noise=format_decimal(body.NOISE_PP),
+            )
+        )
+
+    if body.is_low(band, sex):
+        parts.append(ru.BODY_LOW_FAT)
+
+    parts.append(ru.BODY_ACCURACY)
+    return "\n\n".join(parts)

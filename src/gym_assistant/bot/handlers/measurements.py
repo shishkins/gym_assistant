@@ -11,12 +11,13 @@ from aiogram.types import Message
 from aiogram.utils.media_group import MediaGroupBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from gym_assistant.bot.keyboards import cancel_keyboard
+from gym_assistant.bot.keyboards import body_keyboard, cancel_keyboard
 from gym_assistant.bot.states import WeightEntry
 from gym_assistant.bot.texts import render, ru
-from gym_assistant.domain.models import User
+from gym_assistant.config import Settings
+from gym_assistant.domain.models import Role, User
 from gym_assistant.domain.parsing import ValueParseError, parse_weight
-from gym_assistant.domain.services import MeasurementService
+from gym_assistant.domain.services import Access, MeasurementService
 
 router = Router(name="measurements")
 
@@ -108,11 +109,16 @@ async def weight_entered(
 
 
 @router.message(F.photo)
-async def photo_received(message: Message, session: AsyncSession, user: User) -> None:
+async def photo_received(
+    message: Message, session: AsyncSession, user: User, access: Access, settings: Settings
+) -> None:
     """Any photo becomes a progress shot.
 
     We store Telegram's file_id rather than the bytes: Telegram keeps the
     file, and we keep a handle to it.
+
+    Nothing reads the photo here. A subscriber gets a button to ask for a
+    body-composition estimate; pressing it is the only way one happens.
     """
     assert message.photo is not None
     file_id = message.photo[-1].file_id  # last entry is the largest rendition
@@ -124,17 +130,22 @@ async def photo_received(message: Message, session: AsyncSession, user: User) ->
         except ValueParseError:
             weight = None  # a caption is free-form; a non-number is fine
 
-    await MeasurementService(session).record(
+    measurement = await MeasurementService(session).record(
         user.id,
         photo_file_id=file_id,
         weight_kg=weight,
         note=message.caption if weight is None else None,
     )
 
+    offer = access.allows(Role.SUBSCRIPTION_USER) and settings.anthropic_api_key is not None
+    keyboard = body_keyboard(measurement.id).as_markup() if offer else None
     if weight is not None:
-        await message.answer(ru.PHOTO_SAVED_WITH_WEIGHT.format(weight=render.format_weight(weight)))
+        await message.answer(
+            ru.PHOTO_SAVED_WITH_WEIGHT.format(weight=render.format_weight(weight)),
+            reply_markup=keyboard,
+        )
     else:
-        await message.answer(ru.PHOTO_SAVED)
+        await message.answer(ru.PHOTO_SAVED, reply_markup=keyboard)
 
 
 @router.message(Command("photos"))

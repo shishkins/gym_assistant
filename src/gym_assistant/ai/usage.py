@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 import structlog
 from sqlalchemy import func, select
@@ -64,6 +65,16 @@ class Tokens:
     @property
     def total(self) -> int:
         return self.input + self.output + self.cache_read + self.cache_write
+
+    @classmethod
+    def of(cls, usage: Any) -> Tokens:
+        """The counters off an API response's ``usage``, missing ones as zero."""
+        return cls(
+            input=getattr(usage, "input_tokens", 0) or 0,
+            output=getattr(usage, "output_tokens", 0) or 0,
+            cache_read=getattr(usage, "cache_read_input_tokens", 0) or 0,
+            cache_write=getattr(usage, "cache_creation_input_tokens", 0) or 0,
+        )
 
 
 def price_for(model: str) -> Price:

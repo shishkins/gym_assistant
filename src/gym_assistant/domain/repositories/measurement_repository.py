@@ -76,6 +76,35 @@ class MeasurementRepository:
         )
         return list(await self._session.scalars(stmt))
 
+    async def photo_of(self, user_id: int, measurement_id: int) -> BodyMeasurement | None:
+        """One photo row, only if it is this user's and has a photo.
+
+        The id arrives in button data, which a client can forge; the owner
+        check lives in the query so no caller can forget it.
+        """
+        stmt = select(BodyMeasurement).where(
+            BodyMeasurement.id == measurement_id,
+            BodyMeasurement.user_id == user_id,
+            BodyMeasurement.photo_file_id.is_not(None),
+        )
+        measurement: BodyMeasurement | None = await self._session.scalar(stmt)
+        return measurement
+
+    async def nearest_weigh_in(self, user_id: int, at: datetime) -> BodyMeasurement | None:
+        """The weigh-in closest in time to ``at``, before or after it."""
+        distance = func.abs(func.extract("epoch", BodyMeasurement.measured_at - at))
+        stmt = (
+            select(BodyMeasurement)
+            .where(
+                BodyMeasurement.user_id == user_id,
+                BodyMeasurement.weight_kg.is_not(None),
+            )
+            .order_by(distance, BodyMeasurement.measured_at.desc())
+            .limit(1)
+        )
+        measurement: BodyMeasurement | None = await self._session.scalar(stmt)
+        return measurement
+
     async def count_photos(self, user_id: int) -> int:
         stmt = (
             select(func.count())
