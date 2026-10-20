@@ -16,6 +16,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant import clock
 from gym_assistant.ai.usage import UsageService
 from gym_assistant.bot.filters import IsAdmin
 from gym_assistant.bot.texts import render, ru
@@ -199,7 +200,7 @@ def _who(target: User) -> str:
 def _until(expires_at: datetime | None, *, lapsed: bool) -> str:
     if expires_at is None:
         return ru.ADMIN_FOREVER
-    when = render.format_date(expires_at.date())
+    when = render.format_date(clock.local_date(expires_at))
     return ru.ADMIN_LAPSED.format(when=when) if lapsed else ru.ADMIN_UNTIL_DATE.format(when=when)
 
 

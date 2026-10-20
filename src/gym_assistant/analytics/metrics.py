@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
+from gym_assistant import clock
 from gym_assistant.domain.models import WorkoutSet
 
 # Epley overestimates badly past a dozen reps: a 20-rep set is a test of
@@ -105,8 +106,8 @@ class ProgressPoint:
 
 
 def week_start(moment: datetime | date) -> date:
-    """Monday of the week this moment falls in."""
-    day = moment.date() if isinstance(moment, datetime) else moment
+    """Monday of the week this moment falls in, by the bot's clock."""
+    day = clock.local_date(moment) if isinstance(moment, datetime) else moment
     return day - timedelta(days=day.weekday())
 
 
@@ -146,7 +147,7 @@ def exercise_progress(sets: Iterable[WorkoutSet]) -> list[ProgressPoint]:
     """One point per training day: the best working set of that day."""
     by_day: dict[date, list[WorkoutSet]] = defaultdict(list)
     for item in working_sets(sets):
-        by_day[item.performed_at.date()].append(item)
+        by_day[clock.local_date(item.performed_at)].append(item)
 
     points = [
         ProgressPoint(

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import html
 from collections.abc import Sequence
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from decimal import Decimal
 from urllib.parse import quote_plus
 
+from gym_assistant import clock
 from gym_assistant.bot.texts import ru
 from gym_assistant.domain import body
 from gym_assistant.domain.models import (
@@ -70,11 +71,10 @@ def format_date(value: date) -> str:
 
 def format_when(moment: datetime, *, now: datetime | None = None) -> str:
     """Coarse, human wording: exact timestamps are noise in a chat."""
-    now = now or datetime.now(UTC)
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
+    today = clock.local_date(now) if now is not None else clock.today()
+    day = clock.local_date(moment)
 
-    days = (now.date() - moment.date()).days
+    days = (today - day).days
     if days <= 0:
         return "сегодня"
     if days == 1:
@@ -83,7 +83,7 @@ def format_when(moment: datetime, *, now: datetime | None = None) -> str:
         return f"{days} дн. назад"
     if days < 30:
         return f"{days // 7} нед. назад"
-    return format_date(moment.date())
+    return format_date(day)
 
 
 def render_profile(summary: ProfileSummary) -> str:
@@ -332,7 +332,7 @@ def render_body_estimate(
     """
     band = body.Band(estimate.bf_low, estimate.bf_likely, estimate.bf_high)
     parts = [
-        ru.BODY_HEADER.format(date=format_date(estimate.measured_at.date())),
+        ru.BODY_HEADER.format(date=format_date(clock.local_date(estimate.measured_at))),
         ru.BODY_FAT.format(
             low=format_decimal(band.low),
             likely=format_decimal(band.likely),
@@ -391,7 +391,7 @@ def render_body_estimate(
         }[body.trend(before, band)]
         parts.append(
             template.format(
-                date=format_date(previous.measured_at.date()),
+                date=format_date(clock.local_date(previous.measured_at)),
                 previous=format_decimal(previous.bf_likely),
                 noise=format_decimal(body.NOISE_PP),
             )

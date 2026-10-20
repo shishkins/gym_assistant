@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import html
-from datetime import date
 
 from aiogram import Router
 from aiogram.filters import Command, CommandStart, StateFilter
@@ -11,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from gym_assistant import __version__
+from gym_assistant import __version__, clock
 from gym_assistant.bot.handlers import onboarding
 from gym_assistant.bot.states import ExerciseSearch
 from gym_assistant.bot.texts import render, ru
@@ -26,7 +25,7 @@ router = Router(name="common")
 async def cmd_start(message: Message, state: FSMContext, session: AsyncSession, user: User) -> None:
     await state.clear()
     name = html.escape(user.first_name or "друг")
-    summary = await ProfileService(session).get_summary(user.id, today=date.today())
+    summary = await ProfileService(session).get_summary(user.id, today=clock.today())
 
     if summary.is_empty:
         await message.answer(ru.START_GREETING.format(name=name))

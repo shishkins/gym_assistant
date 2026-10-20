@@ -9,8 +9,9 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 from urllib.parse import quote_plus
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -67,6 +68,16 @@ class Settings(BaseSettings):
     # lives in the same place, and a per-user field earns its keep on the day
     # that stops being true.
     timezone: str = "UTC"
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_zone(cls, value: str) -> str:
+        """A typo here would otherwise surface as wrong weeks, silently."""
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"unknown time zone: {value!r}") from exc
+        return value
 
     @staticmethod
     def _ids(raw: str) -> frozenset[int]:

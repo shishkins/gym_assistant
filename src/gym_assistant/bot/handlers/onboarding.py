@@ -7,8 +7,6 @@ cannot drift out of sync with the "answer" path.
 
 from __future__ import annotations
 
-from datetime import date
-
 import structlog
 from aiogram import F, Router
 from aiogram.filters import StateFilter
@@ -16,6 +14,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant import clock
 from gym_assistant.bot.keyboards import (
     CHOICE_ENUMS,
     ChoiceCB,
@@ -77,7 +76,7 @@ async def _advance(
         return
 
     await state.clear()
-    summary = await ProfileService(session).get_summary(user.id, today=date.today())
+    summary = await ProfileService(session).get_summary(user.id, today=clock.today())
     if summary.is_empty:
         await message.answer(ru.ONBOARDING_DONE_EMPTY)
     else:
@@ -172,7 +171,7 @@ async def birth_date_entered(
         await message.answer(ru.ERROR_DATE_FORMAT)
         return
     try:
-        value = parse_birth_date(message.text, today=date.today())
+        value = parse_birth_date(message.text, today=clock.today())
     except ValueParseError as exc:
         await message.answer(
             ru.ERROR_DATE_FORMAT if exc.reason == "format" else ru.ERROR_DATE_RANGE

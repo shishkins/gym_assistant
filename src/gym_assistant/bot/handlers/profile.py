@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import date
-
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant import clock
 from gym_assistant.analytics.metrics import personal_records
 from gym_assistant.bot.keyboards import (
     CHOICE_ENUMS,
@@ -47,7 +46,7 @@ PROFILE_RECORD_COUNT = 3
 
 
 async def show_card(message: Message, session: AsyncSession, user: User) -> None:
-    summary = await ProfileService(session).get_summary(user.id, today=date.today())
+    summary = await ProfileService(session).get_summary(user.id, today=clock.today())
     text = render.render_profile(summary)
 
     # Requested during the iteration 3 review: the maxima belong on the card,
@@ -159,7 +158,7 @@ async def value_entered(
     if field == "birth_date":
         try:
             await service.update_profile(
-                user.id, birth_date=parse_birth_date(message.text, today=date.today())
+                user.id, birth_date=parse_birth_date(message.text, today=clock.today())
             )
         except ValueParseError as exc:
             await message.answer(

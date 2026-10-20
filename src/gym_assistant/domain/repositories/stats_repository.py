@@ -15,6 +15,7 @@ from sqlalchemy import Date, Select, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from gym_assistant import clock
 from gym_assistant.domain.models import Exercise, Workout, WorkoutSet, WorkoutStatus
 
 
@@ -64,13 +65,8 @@ class StatsRepository:
     async def weekly_tonnage(
         self, user_id: int, *, since: datetime | None = None
     ) -> list[tuple[date, Decimal]]:
-        """Weight moved per ISO week.
-
-        Weeks are cut in UTC, which shifts a Monday-morning session by a few
-        hours for anyone east of London. Not worth a per-user timezone until
-        the bot has users in more than one.
-        """
-        week = func.date_trunc("week", WorkoutSet.performed_at)
+        """Weight moved per ISO week, the weeks cut by the bot's clock."""
+        week = func.date_trunc("week", func.timezone(clock.zone_name(), WorkoutSet.performed_at))
         stmt = (
             select(week.label("week"), func.sum(WorkoutSet.weight_kg * WorkoutSet.reps))
             .join(Workout, Workout.id == WorkoutSet.workout_id)
@@ -92,7 +88,7 @@ class StatsRepository:
         self, user_id: int, *, since: datetime | None = None
     ) -> list[tuple[date, int]]:
         """Days that hold a completed session, with how many sets each holds."""
-        day = cast(Workout.started_at, Date)
+        day = cast(func.timezone(clock.zone_name(), Workout.started_at), Date)
         stmt = (
             select(day.label("day"), func.count(WorkoutSet.id))
             .select_from(Workout)

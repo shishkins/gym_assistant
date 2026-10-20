@@ -11,7 +11,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
 
-from gym_assistant import __version__
+from gym_assistant import __version__, clock
 from gym_assistant.bot.commands import BOT_COMMANDS
 from gym_assistant.bot.handlers import get_routers
 from gym_assistant.bot.middlewares import (
@@ -30,6 +30,7 @@ from gym_assistant.logging_setup import setup_logging
 async def main() -> None:
     settings = get_settings()
     setup_logging(settings.log_level, json_logs=settings.is_production)
+    clock.configure(settings.timezone)
     log = structlog.get_logger("gym_assistant")
 
     engine = create_engine(settings.database_url)

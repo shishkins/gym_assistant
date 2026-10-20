@@ -25,6 +25,7 @@ from typing import Any
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant import clock
 from gym_assistant.analytics.metrics import (
     exercise_progress,
     personal_records,
@@ -72,9 +73,7 @@ def _money(value: Decimal | float | None) -> float | None:
 
 async def get_profile(ctx: ToolContext) -> dict[str, Any]:
     """Height, age, goal, experience, current weight."""
-    summary = await ProfileService(ctx.session).get_summary(
-        ctx.user.id, today=datetime.now(UTC).date()
-    )
+    summary = await ProfileService(ctx.session).get_summary(ctx.user.id, today=clock.today())
     return {
         "sex": summary.sex.value if summary.sex else None,
         "age": summary.age,
@@ -114,13 +113,13 @@ async def list_recent_workouts(ctx: ToolContext, limit: int = 5) -> dict[str, An
     # Pick the days first, then aggregate only those. Filtering while
     # grouping needs the day to be known before it is added, which is the
     # kind of loop that quietly returns one day too many.
-    wanted = sorted({item.performed_at.date() for item in sets}, reverse=True)[:limit]
+    wanted = sorted({clock.local_date(item.performed_at) for item in sets}, reverse=True)[:limit]
 
     by_day: dict[str, dict[str, Any]] = {
         day.isoformat(): {"date": day.isoformat(), "exercises": {}} for day in wanted
     }
     for item in sets:
-        entry = by_day.get(item.performed_at.date().isoformat())
+        entry = by_day.get(clock.local_date(item.performed_at).isoformat())
         if entry is None:
             continue
         name = item.exercise.name_ru if item.exercise else "?"
@@ -177,7 +176,9 @@ async def get_personal_records(ctx: ToolContext, limit: int = 10) -> dict[str, A
                 "exercise": record.exercise_name,
                 "weight_kg": _money(record.best_weight),
                 "reps": record.best_weight_reps,
-                "at": record.best_weight_at.date().isoformat() if record.best_weight_at else None,
+                "at": clock.local_date(record.best_weight_at).isoformat()
+                if record.best_weight_at
+                else None,
                 "estimated_1rm_kg": _money(record.best_estimate),
             }
             for record in personal_records(sets)[:limit]
@@ -214,7 +215,10 @@ async def get_body_weight(ctx: ToolContext, period: str = DEFAULT_PERIOD) -> dic
     return {
         "period": period,
         "measurements": [
-            {"date": item.measured_at.date().isoformat(), "weight_kg": _money(item.weight_kg)}
+            {
+                "date": clock.local_date(item.measured_at).isoformat(),
+                "weight_kg": _money(item.weight_kg),
+            }
             for item in reversed(history)
             if item.weight_kg is not None
         ],

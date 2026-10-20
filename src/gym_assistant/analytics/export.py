@@ -11,6 +11,7 @@ import csv
 import io
 from collections.abc import Sequence
 
+from gym_assistant import clock
 from gym_assistant.domain.models import BodyMeasurement, WorkoutSet
 
 BOM = "﻿"
@@ -55,7 +56,7 @@ def _write(columns: Sequence[str], rows: Sequence[Sequence[object]]) -> bytes:
 def sets_to_csv(sets: Sequence[WorkoutSet]) -> bytes:
     rows = [
         (
-            item.performed_at.date().isoformat(),
+            clock.local_date(item.performed_at).isoformat(),
             item.performed_at.strftime("%H:%M"),
             item.exercise.name_ru if item.exercise else "",
             item.exercise.primary_muscle_group.name_ru if item.exercise else "",
@@ -75,7 +76,7 @@ def sets_to_csv(sets: Sequence[WorkoutSet]) -> bytes:
 def measurements_to_csv(measurements: Sequence[BodyMeasurement]) -> bytes:
     rows = [
         (
-            item.measured_at.date().isoformat(),
+            clock.local_date(item.measured_at).isoformat(),
             item.weight_kg,
             item.body_fat_pct,
             item.chest_cm,

@@ -12,6 +12,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant import clock
 from gym_assistant.analytics import charts, export
 from gym_assistant.analytics.metrics import (
     moving_average,
@@ -218,7 +219,7 @@ async def report(
                 user.id, since=since, limit=1000
             )
             points = [
-                (item.measured_at.date(), item.weight_kg)
+                (clock.local_date(item.measured_at), item.weight_kg)
                 for item in reversed(measurements)
                 if item.weight_kg is not None
             ]
@@ -390,7 +391,7 @@ async def _export(message: Message, session: AsyncSession, user: User) -> None:
         return
 
     await message.answer(ru.EXPORT_READY.format(sets=len(sets), measurements=len(measurements)))
-    stamp = datetime.now(UTC).date().isoformat()
+    stamp = clock.today().isoformat()
     if sets:
         await message.answer_document(
             BufferedInputFile(export.sets_to_csv(sets), filename=f"подходы_{stamp}.csv")
