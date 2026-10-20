@@ -13,6 +13,7 @@ from typing import Any
 
 import structlog
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.domain.models import AiMessage, AiSession
@@ -67,9 +68,21 @@ class ConversationService:
             found.is_active = False
             await self._session.flush()
 
-        started = AiSession(user_id=user_id, last_used_at=now)
-        self._session.add(started)
-        await self._session.flush()
+        # Two quick questions are genuinely concurrent and can both find no
+        # live conversation. The partial unique index decides; the loser
+        # re-reads instead of crashing - the same rule as starting a workout.
+        try:
+            async with self._session.begin_nested():
+                started = AiSession(user_id=user_id, last_used_at=now)
+                self._session.add(started)
+                await self._session.flush()
+        except IntegrityError:
+            winner = await self._session.scalar(
+                select(AiSession).where(AiSession.user_id == user_id, AiSession.is_active)
+            )
+            if winner is None:  # pragma: no cover - only on a real DB fault
+                raise
+            return winner
         return started
 
     async def history(self, session_id: int) -> list[dict[str, Any]]:

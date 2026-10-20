@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant.ai.conversation import IDLE_HOURS, MAX_TURNS, ConversationService
@@ -227,3 +228,32 @@ async def test_every_tool_use_still_has_its_result(session: AsyncSession) -> Non
                 counted[block["type"]] += 1
 
     assert counted["tool_use"] == counted["tool_result"]
+
+
+async def test_two_questions_at_once_share_one_conversation(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review: both requests found nothing, both inserted, and the unique
+    index raised an IntegrityError nobody caught.
+
+    Simulated by letting the first lookup miss a conversation that already
+    exists - exactly what the second of two concurrent requests sees.
+    """
+    from typing import Any
+
+    user = await ProfileService(session).get_or_create_user(8801)
+    service = ConversationService(session)
+    first = await service.active(user.id)
+
+    real_scalar = session.scalar
+    calls = {"n": 0}
+
+    async def miss_once(*args: Any, **kwargs: Any) -> Any:
+        calls["n"] += 1
+        return None if calls["n"] == 1 else await real_scalar(*args, **kwargs)
+
+    monkeypatch.setattr(session, "scalar", miss_once)
+
+    second = await service.active(user.id)
+
+    assert second.id == first.id

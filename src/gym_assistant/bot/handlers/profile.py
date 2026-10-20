@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
+
 from aiogram import Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -134,7 +137,11 @@ async def choice_applied(
     await callback.answer(ru.PROFILE_UPDATED)
     message = callback.message
     if isinstance(message, Message):
-        await message.delete()
+        # Tidying up, not part of the change: a message older than 48 hours
+        # cannot be deleted, and that refusal used to roll back an edit the
+        # toast above had already confirmed.
+        with suppress(TelegramBadRequest):
+            await message.delete()
         await show_card(message, session, user)
 
 
