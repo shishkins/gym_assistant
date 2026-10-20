@@ -159,3 +159,22 @@ def test_progress_chart_survives_gaps_in_the_data() -> None:
         ),
     ]
     assert charts.exercise_progress_chart("Жим", points) is not None
+
+
+def test_the_trend_is_fitted_against_dates_not_point_order() -> None:
+    """The review: three sessions a day apart, then one two weeks later. By
+    index the line rose by a step per point; by date the long gap flattens it."""
+    from gym_assistant.analytics.charts import trend_line
+
+    days = [0.0, 1.0, 2.0, 16.0]
+    weights = [80.0, 81.0, 82.0, 83.0]
+
+    trend = trend_line(days, weights)
+
+    assert trend is not None
+    # A straight line on the date axis: the same rise per day on both sides
+    # of the gap. Fitted by index it rose a full step per point instead -
+    # as much over the two-week gap as over a single day.
+    before_gap = (trend[1] - trend[0]) / (days[1] - days[0])
+    across_gap = (trend[3] - trend[2]) / (days[3] - days[2])
+    assert abs(before_gap - across_gap) < 1e-9

@@ -61,6 +61,23 @@ def _format_dates(axes: Axes) -> None:
     axes.xaxis.set_major_formatter(DateFormatter("%d.%m"))
 
 
+def trend_line(days: Sequence[float], values: Sequence[float]) -> np.ndarray | None:
+    """A straight-line fit through the points, evaluated at every date.
+
+    Fitted against the dates, not the point index: the line is drawn on a
+    date axis, and sessions are not evenly spaced. Fitting by index made a
+    two-week break look like a single day. ``None`` below
+    :data:`MIN_POINTS_FOR_TREND` usable points.
+    """
+    usable = [(day, value) for day, value in zip(days, values, strict=True) if not np.isnan(value)]
+    if len(usable) < MIN_POINTS_FOR_TREND:
+        return None
+    xs = np.array([day for day, _ in usable], dtype=float)
+    ys = np.array([value for _, value in usable], dtype=float)
+    slope, intercept = np.polyfit(xs, ys, 1)
+    return np.asarray(slope * np.asarray(days, dtype=float) + intercept)
+
+
 def exercise_progress_chart(name: str, points: Sequence[ProgressPoint]) -> bytes | None:
     """Working weight and estimated maximum over time, with a trend line."""
     if len(points) < MIN_POINTS:
@@ -85,12 +102,8 @@ def exercise_progress_chart(name: str, points: Sequence[ProgressPoint]) -> bytes
         alpha=0.9,
     )
 
-    usable = [(index, value) for index, value in enumerate(weights) if not np.isnan(value)]
-    if len(usable) >= MIN_POINTS_FOR_TREND:
-        xs = np.array([index for index, _ in usable], dtype=float)
-        ys = np.array([value for _, value in usable], dtype=float)
-        slope, intercept = np.polyfit(xs, ys, 1)
-        trend = slope * np.arange(len(days)) + intercept
+    trend = trend_line(days, weights)
+    if trend is not None:
         axes.plot(days, trend, color=POSITIVE, linestyle="--", linewidth=1.4, label="Тренд")
 
     axes.set_ylabel("кг")
