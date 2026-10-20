@@ -310,3 +310,18 @@ def test_moving_average_drops_readings_outside_the_window() -> None:
 
 def test_moving_average_of_nothing() -> None:
     assert moving_average([]) == []
+
+
+def test_weekly_volume_is_averaged_over_calendar_weeks_not_trained_ones() -> None:
+    """The review's case: 4 training weeks of 12 chest sets over 12 weeks is
+    about 4 a week - not 12, which read as "inside the 10-20 band"."""
+    from datetime import date, timedelta
+
+    from gym_assistant.analytics.metrics import average_weekly_volume
+
+    first = date(2026, 7, 6)  # a Monday
+    volume = {first + timedelta(weeks=n): {"Грудь": 12.0} for n in (0, 3, 6, 9)}
+
+    averages = average_weekly_volume(volume, through=first + timedelta(weeks=11))
+
+    assert averages["Грудь"] == 4.0

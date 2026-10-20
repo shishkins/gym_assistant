@@ -143,6 +143,29 @@ def weekly_volume_by_group(sets: Iterable[WorkoutSet]) -> dict[date, dict[str, f
     return {week: dict(groups) for week, groups in volume.items()}
 
 
+def average_weekly_volume(
+    volume: dict[date, dict[str, float]], *, through: date
+) -> dict[str, float]:
+    """Working sets per muscle group per CALENDAR week.
+
+    Divided by every week from the first one trained through ``through`` -
+    not only by the weeks that had a session. Four training weeks of twelve
+    chest sets over three months is about four sets a week, not twelve, and
+    reporting twelve against a 10-20 band told people they were fine.
+    """
+    if not volume:
+        return {}
+    first = min(volume)
+    last = max(week_start(through), max(volume))
+    weeks = (last - first).days // 7 + 1
+
+    totals: dict[str, float] = defaultdict(float)
+    for groups in volume.values():
+        for group, count in groups.items():
+            totals[group] += count
+    return {group: total / weeks for group, total in totals.items()}
+
+
 def exercise_progress(sets: Iterable[WorkoutSet]) -> list[ProgressPoint]:
     """One point per training day: the best working set of that day."""
     by_day: dict[date, list[WorkoutSet]] = defaultdict(list)

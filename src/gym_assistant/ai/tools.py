@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant import clock
 from gym_assistant.analytics.metrics import (
+    average_weekly_volume,
     exercise_progress,
     personal_records,
     total_tonnage,
@@ -191,19 +192,14 @@ async def get_weekly_volume(ctx: ToolContext, period: str = DEFAULT_PERIOD) -> d
     sets = await StatsRepository(ctx.session).sets_with_exercises(ctx.user.id, since=_since(period))
     volume = weekly_volume_by_group(sets)
     if not volume:
-        return {"period": period, "weeks": 0, "groups": {}}
+        return {"period": period, "weeks_trained": 0, "groups": {}}
 
-    totals: dict[str, float] = {}
-    for week in volume.values():
-        for group, count in week.items():
-            totals[group] = totals.get(group, 0.0) + count
-
-    weeks = len(volume)
+    averages = average_weekly_volume(volume, through=clock.today())
     return {
         "period": period,
-        "weeks": weeks,
+        "weeks_trained": len(volume),
         "recommended_per_week": [10, 20],
-        "groups": {group: round(total / weeks, 1) for group, total in sorted(totals.items())},
+        "groups": {group: round(value, 1) for group, value in sorted(averages.items())},
     }
 
 

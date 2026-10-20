@@ -20,9 +20,11 @@ from matplotlib.axes import Axes
 from matplotlib.dates import DateFormatter, date2num
 from matplotlib.figure import Figure
 
+from gym_assistant import clock
 from gym_assistant.analytics.metrics import (
     RECOMMENDED_WEEKLY_SETS,
     ProgressPoint,
+    average_weekly_volume,
     week_start,
 )
 from gym_assistant.analytics.style import (
@@ -139,14 +141,8 @@ def muscle_volume_chart(volume: dict[date, dict[str, float]]) -> bytes | None:
     if not volume:
         return None
 
-    weeks = len(volume)
-    totals: dict[str, float] = {}
-    for week in volume.values():
-        for group, sets in week.items():
-            totals[group] = totals.get(group, 0.0) + sets
-
     averages = sorted(
-        ((group, total / weeks) for group, total in totals.items()),
+        average_weekly_volume(volume, through=clock.today()).items(),
         key=lambda pair: pair[1],
     )
     if not averages:
