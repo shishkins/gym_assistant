@@ -597,3 +597,14 @@ async def test_favourite_toggles_back(bot: BotHarness, session: AsyncSession) ->
     service = ExerciseService(session)
     bench = (await service.search("бенч", user_id=user.id))[0]
     assert await service.is_favourite(user.id, bench.id) is False
+
+
+async def test_a_command_during_a_session_is_a_command_not_an_exercise(bot: BotHarness) -> None:
+    """Found by the review: "/stats" mid-session came back as "no such exercise"."""
+    await bot.send("/workout")
+    await bot.send("жим 80х8")
+
+    await bot.send("/stats")
+
+    assert "Не нашёл упражнение" not in bot.session.last_text
+    assert "/stats" not in bot.session.last_text

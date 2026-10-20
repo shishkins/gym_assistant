@@ -357,7 +357,7 @@ async def pick_exercise(
     await _edit(callback, text, markup)
 
 
-@router.message(WorkoutFlow.search)
+@router.message(WorkoutFlow.search, ~F.text.startswith("/"))
 async def search_exercise(
     message: Message, state: FSMContext, session: AsyncSession, user: User
 ) -> None:
@@ -491,7 +491,10 @@ async def commit_set(
 # --- typed sets -----------------------------------------------------------
 
 
-@router.message(WorkoutFlow.active, F.text)
+# Commands are left alone: this router sits before stats and exercises, so
+# without the guard "/stats" mid-session was read as an exercise to log -
+# and answered with "no such exercise".
+@router.message(WorkoutFlow.active, F.text, ~F.text.startswith("/"))
 async def typed_set(message: Message, state: FSMContext, session: AsyncSession, user: User) -> None:
     """Free text during a session is a set - the fastest path there is."""
     assert message.text is not None
