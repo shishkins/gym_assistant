@@ -33,7 +33,7 @@ step "ruff check"        uv run ruff check .
 step "ruff format"       uv run ruff format --check .
 step "mypy"              uv run mypy src/gym_assistant
 step "alembic"           uv run alembic upgrade head
-step "pytest"            uv run pytest -q
+step "pytest"            env REQUIRE_DB=1 uv run pytest -q
 
 echo
 if [ "$failed" -gt 0 ]; then

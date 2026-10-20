@@ -11,6 +11,7 @@ suite leaves no residue and tests cannot see each other's rows.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import AsyncIterator, Iterator
 from urllib.parse import quote_plus
 
@@ -70,6 +71,12 @@ def database_url() -> Iterator[str]:
     try:
         asyncio.run(_prepare(settings, database))
     except OSError as exc:  # no server reachable
+        # Skipping is right for a quick local run of the unit tests. It is
+        # wrong for the gate: check.sh once reported pytest "ok" with every
+        # integration test skipped because Docker was not running. The gate
+        # sets REQUIRE_DB, and then a missing database is a failure.
+        if os.environ.get("REQUIRE_DB"):
+            pytest.fail(f"PostgreSQL is required (REQUIRE_DB is set) but unreachable: {exc}")
         pytest.skip(f"PostgreSQL is not available: {exc}")
 
     url = _async_url(settings, database)

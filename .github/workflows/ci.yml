@@ -46,6 +46,8 @@ jobs:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
       REDIS_URL: redis://localhost:6379/0
+      # A missing database fails the integration tests instead of skipping them.
+      REQUIRE_DB: "1"
 
     steps:
       - uses: actions/checkout@v4
