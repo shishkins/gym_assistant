@@ -15,6 +15,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant.bot.editing import edit_or_send
 from gym_assistant.bot.keyboards import (
     SetAdjustCB,
     SetCommitCB,
@@ -115,17 +116,6 @@ async def _exercise_panel(
     )
 
 
-async def _edit(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup) -> None:
-    message = callback.message
-    if not isinstance(message, Message):
-        return
-    try:
-        await message.edit_text(text, reply_markup=markup)
-    except Exception:
-        log.debug("workout_edit_failed")
-        await message.answer(text, reply_markup=markup)
-
-
 # --- entry points ---------------------------------------------------------
 
 
@@ -184,14 +174,14 @@ async def workout_action(
             await service.start(user.id)
             await state.set_state(WorkoutFlow.active)
             text, markup = await _panel(service, user)
-            await _edit(callback, text, markup)
+            await edit_or_send(callback, text, markup)
 
         case "panel":
             await state.set_state(WorkoutFlow.active)
             # Forget the pending set: the panel is a fresh choice of exercise.
             await state.update_data(exercise_id=None, weight=None, reps=None, lbs_input=False)
             text, markup = await _panel(service, user)
-            await _edit(callback, text, markup)
+            await edit_or_send(callback, text, markup)
 
         case "find":
             await state.set_state(WorkoutFlow.search)
@@ -276,7 +266,7 @@ async def _toggle_lbs(
     if exercise is None:
         return
     text, markup = await _exercise_panel(WorkoutService(session), user, exercise, state)
-    await _edit(callback, text, markup)
+    await edit_or_send(callback, text, markup)
 
 
 @router.callback_query(WorkoutFavCB.filter())
@@ -307,7 +297,7 @@ async def toggle_favourite(
         return
 
     text, markup = await _exercise_panel(WorkoutService(session), user, exercise, state)
-    await _edit(callback, text, markup)
+    await edit_or_send(callback, text, markup)
 
 
 async def _undo(
@@ -333,9 +323,11 @@ async def _finish(
     summary = await service.finish(user.id)
     await state.clear()
     if summary is None:
-        await _edit(callback, ru.WORKOUT_NONE_OPEN, start_keyboard(is_open=False))
+        await edit_or_send(callback, ru.WORKOUT_NONE_OPEN, start_keyboard(is_open=False))
         return
-    await _edit(callback, render.render_workout_summary(summary), start_keyboard(is_open=False))
+    await edit_or_send(
+        callback, render.render_workout_summary(summary), start_keyboard(is_open=False)
+    )
 
 
 # --- choosing an exercise -------------------------------------------------
@@ -356,7 +348,7 @@ async def pick_exercise(
     # Choosing an exercise resets the pending values to that exercise's own.
     await state.update_data(exercise_id=None, weight=None, reps=None, lbs_input=False)
     text, markup = await _exercise_panel(WorkoutService(session), user, exercise, state)
-    await _edit(callback, text, markup)
+    await edit_or_send(callback, text, markup)
 
 
 @router.message(WorkoutFlow.search, ~F.text.startswith("/"))
@@ -399,7 +391,7 @@ async def search_page(
     text, markup = await _search_page(
         ExerciseService(session), user, query, page=callback_data.page
     )
-    await _edit(callback, text, markup)
+    await edit_or_send(callback, text, markup)
 
 
 async def _search_page(
@@ -455,7 +447,7 @@ async def adjust_set(
     if exercise is None:
         return
     text, markup = await _exercise_panel(WorkoutService(session), user, exercise, state)
-    await _edit(callback, text, markup)
+    await edit_or_send(callback, text, markup)
 
 
 @router.callback_query(SetCommitCB.filter())

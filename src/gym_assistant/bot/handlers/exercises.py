@@ -9,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gym_assistant.bot.editing import edit_or_send
 from gym_assistant.bot.keyboards import (
     EQUIPMENT_BY_VALUE,
     TYPE_BY_VALUE,
@@ -46,20 +47,6 @@ NAME_MAX_LENGTH = 80
 # Telegram renders a taller keyboard, but a list you scroll past the message
 # box stops being scannable - and an unbounded one is eventually refused.
 PAGE_SIZE = 8
-
-
-async def _edit(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup) -> None:
-    """Navigates in place instead of stacking new messages in the chat."""
-    message = callback.message
-    if not isinstance(message, Message):
-        return
-    try:
-        await message.edit_text(text, reply_markup=markup)
-    except Exception:
-        # Telegram rejects an edit that changes nothing, and a message may be
-        # too old to edit. Neither is worth failing the interaction over.
-        log.debug("catalogue_edit_failed")
-        await message.answer(text, reply_markup=markup)
 
 
 async def _in_workout(session: AsyncSession, user: User) -> bool:
@@ -201,7 +188,7 @@ async def _show_card(
         await callback.answer(ru.EXERCISES_GROUP_EMPTY, show_alert=True)
         return
     is_favourite = await service.is_favourite(user.id, exercise.id)
-    await _edit(
+    await edit_or_send(
         callback,
         render.render_exercise_card(exercise),
         exercise_card_keyboard(exercise, is_favourite=is_favourite, workout_open=workout_open),
@@ -259,14 +246,14 @@ async def menu_action(
         case "menu":
             if not workout_open:
                 await state.set_state(ExerciseSearch.query)
-            await _edit(
+            await edit_or_send(
                 callback,
                 await _menu_text(service, user),
                 menu_keyboard(workout_open=workout_open),
             )
 
         case "groups":
-            await _edit(
+            await edit_or_send(
                 callback,
                 ru.EXERCISES_GROUPS,
                 groups_keyboard(await service.muscle_groups(), workout_open=workout_open),
@@ -276,11 +263,11 @@ async def menu_action(
             text, markup = await _list_view(
                 service, user, kind="favourites", workout_open=workout_open
             )
-            await _edit(callback, text, markup)
+            await edit_or_send(callback, text, markup)
 
         case "own":
             text, markup = await _list_view(service, user, kind="own", workout_open=workout_open)
-            await _edit(callback, text, markup)
+            await edit_or_send(callback, text, markup)
 
         case "search":
             await state.set_state(ExerciseSearch.query)
@@ -320,7 +307,7 @@ async def list_page(
         query=data.get("search_query", ""),
         workout_open=await _in_workout(session, user),
     )
-    await _edit(callback, text, markup)
+    await edit_or_send(callback, text, markup)
 
 
 @router.callback_query(ExCardCB.filter())
@@ -374,7 +361,9 @@ async def hide_exercise(
     name = render.escape(exercise.name_ru)
     await service.set_hidden(user.id, exercise.id, hidden=True)
     await callback.answer()
-    await _edit(callback, ru.EXERCISE_HIDDEN.format(name=name), undo_hide_keyboard(exercise.id))
+    await edit_or_send(
+        callback, ru.EXERCISE_HIDDEN.format(name=name), undo_hide_keyboard(exercise.id)
+    )
 
 
 @router.callback_query(ExUnhideCB.filter())
@@ -391,7 +380,7 @@ async def unhide_exercise(
     await callback.answer()
     if exercise is None:
         return
-    await _edit(
+    await edit_or_send(
         callback, ru.EXERCISE_RESTORED.format(name=render.escape(exercise.name_ru)), menu_keyboard()
     )
 
@@ -447,7 +436,7 @@ async def new_group_chosen(
     await state.update_data(muscle_group_id=int(callback_data.value))
     await state.set_state(ExerciseCreate.equipment)
     await callback.answer()
-    await _edit(callback, ru.EXERCISE_NEW_EQUIPMENT, new_equipment_keyboard())
+    await edit_or_send(callback, ru.EXERCISE_NEW_EQUIPMENT, new_equipment_keyboard())
 
 
 @router.callback_query(ExerciseCreate.equipment, ExNewCB.filter())
@@ -457,7 +446,7 @@ async def new_equipment_chosen(
     await state.update_data(equipment=callback_data.value)
     await state.set_state(ExerciseCreate.exercise_type)
     await callback.answer()
-    await _edit(callback, ru.EXERCISE_NEW_TYPE, new_type_keyboard())
+    await edit_or_send(callback, ru.EXERCISE_NEW_TYPE, new_type_keyboard())
 
 
 @router.callback_query(ExerciseCreate.exercise_type, ExNewCB.filter())
@@ -482,7 +471,7 @@ async def new_type_chosen(
             exercise_type=TYPE_BY_VALUE[callback_data.value],
         )
     except DuplicateExerciseError:
-        await _edit(callback, ru.EXERCISE_NEW_DUPLICATE, menu_keyboard())
+        await edit_or_send(callback, ru.EXERCISE_NEW_DUPLICATE, menu_keyboard())
         return
 
     message = callback.message
