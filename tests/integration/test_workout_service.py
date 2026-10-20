@@ -343,3 +343,24 @@ async def test_heavier_for_fewer_reps_is_still_a_record(session: AsyncSession) -
 
     assert logged.is_record
     assert logged.new_best == Decimal("90.00")
+
+
+async def test_last_time_is_the_previous_session_even_on_the_same_day(
+    session: AsyncSession,
+) -> None:
+    """The review's probe: 80x5, finish, a new session, 90x3 - "last time" was
+    showing both, and after a day's first set the previous session vanished."""
+    user_id = await _user(session, 4090)
+    service = WorkoutService(session)
+    bench = await _bench(session, user_id)
+
+    await service.start(user_id, now=NOW)
+    await service.log(user_id, bench, parse_set_entry("80х5"), now=NOW)
+    await service.finish(user_id, now=NOW + timedelta(minutes=30))
+
+    await service.start(user_id, now=NOW + timedelta(hours=3))
+    await service.log(user_id, bench, parse_set_entry("90х3"), now=NOW + timedelta(hours=3))
+
+    history = await service.history_for(user_id, bench)
+    assert [(item.weight_kg, item.reps) for item in history.last_sets] == [(Decimal("80.00"), 5)]
+    assert history.last_performed_at == NOW

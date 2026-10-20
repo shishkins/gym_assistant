@@ -142,6 +142,34 @@ class WorkoutRepository:
         )
         return list(await self._session.scalars(stmt))
 
+    async def last_session_sets(
+        self, user_id: int, exercise_id: int, *, exclude_workout_id: int | None
+    ) -> list[WorkoutSet]:
+        """The exercise's sets from the most recent other session, in order.
+
+        A session is a workout row, not a calendar day: grouping by date put
+        today's first set into "last time", and split a session that ran past
+        midnight in two.
+        """
+        latest = (
+            select(WorkoutSet.workout_id)
+            .join(Workout, Workout.id == WorkoutSet.workout_id)
+            .where(Workout.user_id == user_id, WorkoutSet.exercise_id == exercise_id)
+            .order_by(WorkoutSet.performed_at.desc())
+            .limit(1)
+        )
+        if exclude_workout_id is not None:
+            latest = latest.where(WorkoutSet.workout_id != exclude_workout_id)
+        stmt = (
+            select(WorkoutSet)
+            .where(
+                WorkoutSet.workout_id == latest.scalar_subquery(),
+                WorkoutSet.exercise_id == exercise_id,
+            )
+            .order_by(WorkoutSet.performed_at, WorkoutSet.set_index)
+        )
+        return list(await self._session.scalars(stmt))
+
     async def all_sets_of_exercise(self, user_id: int, exercise_id: int) -> list[WorkoutSet]:
         stmt = (
             select(WorkoutSet)

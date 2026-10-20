@@ -187,19 +187,20 @@ class WorkoutService:
             )
 
         newest = recent[0]
-        # "Last time" means the previous session, not the previous set.
-        same_day = [
-            item for item in recent if item.performed_at.date() == newest.performed_at.date()
-        ]
-        same_day.reverse()
+        # "Last time" means the previous session - not the previous set, and
+        # not the one running now, whose sets the panel lists separately.
+        running = await self._workouts.open_workout(user_id)
+        last_session = await self._workouts.last_session_sets(
+            user_id, exercise.id, exclude_workout_id=running.id if running else None
+        )
 
         prefill = next(
             (item for item in recent if not item.is_warmup and item.reps is not None), newest
         )
         return ExerciseHistory(
             exercise=exercise,
-            last_sets=same_day,
-            last_performed_at=newest.performed_at,
+            last_sets=last_session,
+            last_performed_at=last_session[-1].performed_at if last_session else None,
             best_estimate=best_estimate(recent),
             suggested_weight=prefill.weight_kg,
             suggested_reps=prefill.reps,
