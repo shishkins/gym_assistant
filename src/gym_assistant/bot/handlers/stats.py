@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import structlog
@@ -13,7 +12,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant import clock
-from gym_assistant.analytics import charts, export
+from gym_assistant.analytics import charts, export, periods
 from gym_assistant.analytics.metrics import (
     moving_average,
     personal_records,
@@ -21,6 +20,7 @@ from gym_assistant.analytics.metrics import (
     weekly_volume_by_group,
     working_sets,
 )
+from gym_assistant.analytics.periods import DEFAULT_PERIOD
 from gym_assistant.bot.keyboards.stats import (
     StatsCB,
     StatsExerciseCB,
@@ -41,22 +41,15 @@ from gym_assistant.domain.services import ExerciseService, WorkoutService
 log = structlog.get_logger(__name__)
 router = Router(name="stats")
 
-DEFAULT_PERIOD = "3m"
-PERIOD_DAYS = {"1m": 30, "3m": 90, "6m": 180, "1y": 365, "all": None}
 # A picker longer than this stops being a picker - but truncating it silently,
 # as this did, hides every exercise past the twelfth. Both lists page instead.
 PICKER_PAGE_SIZE = 8
 RECORDS_PAGE_SIZE = 8
 
 
-def _since(period: str) -> datetime | None:
-    days = PERIOD_DAYS.get(period)
-    return None if days is None else datetime.now(UTC) - timedelta(days=days)
-
-
 async def _menu(session: AsyncSession, user: User, period: str) -> tuple[str, InlineKeyboardMarkup]:
     stats = StatsRepository(session)
-    since = _since(period)
+    since = periods.since(period)
     sets = await stats.sets_with_exercises(user.id, since=since)
     days = await stats.workout_days(user.id, since=since)
 
@@ -181,7 +174,7 @@ async def report(
     period = callback_data.period
     label = ru.STATS_PERIOD_LABELS[period]
     stats = StatsRepository(session)
-    since = _since(period)
+    since = periods.since(period)
 
     match callback_data.report:
         case "menu":
@@ -275,7 +268,7 @@ async def exercise_progress(
 
     period = callback_data.period
     sets = await StatsRepository(session).sets_of_exercise(
-        user.id, exercise.id, since=_since(period)
+        user.id, exercise.id, since=periods.since(period)
     )
     points = compute_progress(sets)
     await _send(
@@ -357,7 +350,7 @@ async def _records(
 
 async def _summary(message: Message, session: AsyncSession, user: User, period: str) -> None:
     stats = StatsRepository(session)
-    since = _since(period)
+    since = periods.since(period)
     sets = await stats.sets_with_exercises(user.id, since=since)
     days = await stats.workout_days(user.id, since=since)
 

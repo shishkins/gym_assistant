@@ -65,14 +65,6 @@ class MeasurementService:
         )
         return await self._measurements.add(measurement)
 
-    async def attach_photo(self, measurement_id: int, photo_file_id: str) -> BodyMeasurement:
-        measurement = await self._measurements.get(measurement_id)
-        if measurement is None:
-            raise LookupError(f"measurement {measurement_id} does not exist")
-        measurement.photo_file_id = photo_file_id
-        await self._session.flush()
-        return measurement
-
     async def latest(self, user_id: int) -> BodyMeasurement | None:
         return await self._measurements.latest(user_id)
 

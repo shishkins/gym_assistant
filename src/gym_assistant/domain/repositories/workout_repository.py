@@ -199,14 +199,3 @@ class WorkoutRepository:
         )
         rows = await self._session.execute(stmt)
         return [row[0] for row in rows]
-
-    async def count_completed(self, user_id: int) -> int:
-        stmt = (
-            select(func.count())
-            .select_from(Workout)
-            .where(
-                Workout.user_id == user_id,
-                Workout.status == WorkoutStatus.COMPLETED.value,
-            )
-        )
-        return await self._session.scalar(stmt) or 0

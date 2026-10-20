@@ -142,25 +142,3 @@ class AccessService:
             .limit(limit)
         )
         return [(user, access) for user, access in rows]
-
-    async def ensure_admins(self, telegram_ids: frozenset[int]) -> int:
-        """Makes sure the owners listed in the environment are admins.
-
-        Called on startup and whenever one of them touches the bot, so that
-        wiping the database - which this project does routinely while
-        testing - cannot lock the owner out of their own admin commands.
-        """
-        if not telegram_ids:
-            return 0
-
-        users = list(
-            await self._session.scalars(select(User).where(User.telegram_id.in_(telegram_ids)))
-        )
-        repaired = 0
-        for user in users:
-            stored = await self._session.get(UserAccess, user.id)
-            if stored is not None and Role(stored.role) is Role.ADMIN:
-                continue
-            await self.grant(user.id, Role.ADMIN, note="владелец из ADMIN_TELEGRAM_IDS")
-            repaired += 1
-        return repaired

@@ -18,7 +18,6 @@ they will need confirmation from the person before they touch anything.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -26,6 +25,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gym_assistant import clock
+from gym_assistant.analytics import periods
 from gym_assistant.analytics.metrics import (
     average_weekly_volume,
     exercise_progress,
@@ -34,14 +34,13 @@ from gym_assistant.analytics.metrics import (
     weekly_volume_by_group,
     working_sets,
 )
+from gym_assistant.analytics.periods import DEFAULT_PERIOD, PERIOD_DAYS
 from gym_assistant.domain.models import User
 from gym_assistant.domain.repositories import MeasurementRepository, StatsRepository
 from gym_assistant.domain.services import ExerciseService, ProfileService, WorkoutService
 
 log = structlog.get_logger(__name__)
 
-PERIOD_DAYS = {"1m": 30, "3m": 90, "6m": 180, "1y": 365, "all": None}
-DEFAULT_PERIOD = "3m"
 
 # A tool result is context the model pays for on every later turn, so these
 # are capped at what actually answers a question rather than at what the
@@ -58,11 +57,6 @@ class ToolContext:
 
     session: AsyncSession
     user: User
-
-
-def _since(period: str) -> datetime | None:
-    days = PERIOD_DAYS.get(period, PERIOD_DAYS[DEFAULT_PERIOD])
-    return None if days is None else datetime.now(UTC) - timedelta(days=days)
 
 
 def _money(value: Decimal | float | None) -> float | None:
@@ -89,7 +83,7 @@ async def get_profile(ctx: ToolContext) -> dict[str, Any]:
 async def get_training_summary(ctx: ToolContext, period: str = DEFAULT_PERIOD) -> dict[str, Any]:
     """How much training happened: sessions, sets, tonnage."""
     stats = StatsRepository(ctx.session)
-    since = _since(period)
+    since = periods.since(period)
     sets = await stats.sets_with_exercises(ctx.user.id, since=since)
     days = await stats.workout_days(ctx.user.id, since=since)
 
@@ -135,7 +129,9 @@ async def list_recent_workouts(ctx: ToolContext, limit: int = 5) -> dict[str, An
     last = await service.last_completed(ctx.user.id)
     return {
         "workouts": list(by_day.values()),
-        "last_finished_at": last.workout.started_at.isoformat() if last else None,
+        "last_finished_at": (
+            last.workout.finished_at.isoformat() if last and last.workout.finished_at else None
+        ),
     }
 
 
@@ -149,7 +145,7 @@ async def get_exercise_progress(
 
     target = found[0]
     sets = await StatsRepository(ctx.session).sets_of_exercise(
-        ctx.user.id, target.id, since=_since(period)
+        ctx.user.id, target.id, since=periods.since(period)
     )
     points = exercise_progress(sets)[-MAX_POINTS:]
 
@@ -189,7 +185,9 @@ async def get_personal_records(ctx: ToolContext, limit: int = 10) -> dict[str, A
 
 async def get_weekly_volume(ctx: ToolContext, period: str = DEFAULT_PERIOD) -> dict[str, Any]:
     """Working sets per muscle group per week - what is under- and overworked."""
-    sets = await StatsRepository(ctx.session).sets_with_exercises(ctx.user.id, since=_since(period))
+    sets = await StatsRepository(ctx.session).sets_with_exercises(
+        ctx.user.id, since=periods.since(period)
+    )
     volume = weekly_volume_by_group(sets)
     if not volume:
         return {"period": period, "weeks_trained": 0, "groups": {}}
@@ -206,7 +204,7 @@ async def get_weekly_volume(ctx: ToolContext, period: str = DEFAULT_PERIOD) -> d
 async def get_body_weight(ctx: ToolContext, period: str = DEFAULT_PERIOD) -> dict[str, Any]:
     """Weigh-ins over the period, oldest first."""
     history = await MeasurementRepository(ctx.session).history(
-        ctx.user.id, since=_since(period), limit=MAX_POINTS
+        ctx.user.id, since=periods.since(period), limit=MAX_POINTS
     )
     return {
         "period": period,
