@@ -291,7 +291,10 @@ async def test_ai_usage_names_the_current_model(
 
     await bot.send("/ai_usage")
 
-    assert "claude-opus-5" in bot.session.last_text
+    # Whatever this machine's settings say, not a literal: the default and a
+    # local .env differ, and the test once passed only because of the .env.
+    running = bot.dispatcher["settings"].ai_model_main
+    assert running in bot.session.last_text
 
 
 async def test_the_whole_bill_is_admin_only(
@@ -319,7 +322,7 @@ async def test_an_admin_sees_the_whole_bill(admin_bot: BotHarness, session: Asyn
     reply = admin_bot.session.last_text
     assert "friend" in reply
     assert "5.00" in reply
-    assert "claude-opus-5" in reply
+    assert admin_bot.dispatcher["settings"].ai_model_main in reply
 
 
 # --- delivery -------------------------------------------------------------
